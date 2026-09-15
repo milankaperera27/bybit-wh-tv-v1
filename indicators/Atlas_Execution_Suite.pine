@@ -99,15 +99,15 @@ f_regime_color(int code) =>
 f_regime_code() =>
     float ef = ta.ema(close, 50)
     float es = ta.ema(close, 200)
-    [p, m, a] = ta.dmi(adx_len, adx_len)
+    [rdp, rdm, rax] = ta.dmi(adx_len, adx_len)
     float av = ta.atr(14)
     bool vx = av > ta.sma(av, 50)
     int c = 0
-    if a > adx_threshold and close > es and ef > es
+    if rax > adx_threshold and close > es and ef > es
         c := 1
-    else if a > adx_threshold and close < es and ef < es
+    else if rax > adx_threshold and close < es and ef < es
         c := 2
-    else if a <= adx_threshold and not vx
+    else if rax <= adx_threshold and not vx
         c := 3
     else
         c := 4
@@ -143,8 +143,12 @@ if not na(pl)
 
 // A break of the last swing high while the tracked leg is already bullish is a
 // BOS (continuation); the same break against a bearish/undefined leg is an MSS.
-bool bull_break = not na(last_sh) and ta.crossover(close, last_sh)
-bool bear_break = not na(last_sl) and ta.crossunder(close, last_sl)
+// ta.crossover/ta.crossunder are hoisted out of the `and` chain so they are
+// evaluated on every bar (Pine's logical operators are lazy).
+bool cross_up = ta.crossover(close, last_sh)
+bool cross_dn = ta.crossunder(close, last_sl)
+bool bull_break = not na(last_sh) and cross_up
+bool bear_break = not na(last_sl) and cross_dn
 
 var int trend_dir = 0
 bool bull_bos = false
@@ -190,9 +194,7 @@ if show_smc and bull_fvg
     float gap_bot = high[2]
     float ce = (gap_top + gap_bot) / 2.0
     box b = box.new(bar_index - 2, gap_top, bar_index + fvg_extend, gap_bot, bgcolor=color.new(col_bull, 85), border_color=color.new(col_bull, 40))
-    line m = na
-    if show_fvg_mid
-        m := line.new(bar_index - 2, ce, bar_index + fvg_extend, ce, color=color.new(col_bull, 25), style=line.style_dotted, width=1)
+    line m = line.new(bar_index - 2, ce, bar_index + fvg_extend, ce, color=color.new(col_bull, show_fvg_mid ? 25 : 100), style=line.style_dotted, width=1)
     array.push(fvg_boxes, b)
     array.push(fvg_mids, m)
     array.push(fvg_ce, ce)
@@ -204,9 +206,7 @@ if show_smc and bear_fvg
     float sgap_bot = high
     float sce = (sgap_top + sgap_bot) / 2.0
     box sb = box.new(bar_index - 2, sgap_top, bar_index + fvg_extend, sgap_bot, bgcolor=color.new(col_bear, 85), border_color=color.new(col_bear, 40))
-    line sm = na
-    if show_fvg_mid
-        sm := line.new(bar_index - 2, sce, bar_index + fvg_extend, sce, color=color.new(col_bear, 25), style=line.style_dotted, width=1)
+    line sm = line.new(bar_index - 2, sce, bar_index + fvg_extend, sce, color=color.new(col_bear, show_fvg_mid ? 25 : 100), style=line.style_dotted, width=1)
     array.push(fvg_boxes, sb)
     array.push(fvg_mids, sm)
     array.push(fvg_ce, sce)
@@ -232,7 +232,7 @@ if array.size(fvg_boxes) > 0
                     array.set(fvg_mit, i, true)
                     box.set_bgcolor(array.get(fvg_boxes, i), color.new(col_mit, 90))
                     box.set_border_color(array.get(fvg_boxes, i), color.new(col_mit, 60))
-                    line.set_color(array.get(fvg_mids, i), color.new(col_mit, 60))
+                    line.set_color(array.get(fvg_mids, i), color.new(col_mit, show_fvg_mid ? 60 : 100))
             else
                 box.set_right(array.get(fvg_boxes, i), bar_index + fvg_extend)
                 line.set_x2(array.get(fvg_mids, i), bar_index + fvg_extend)
@@ -359,9 +359,12 @@ if fire_buy or fire_sell
     last_entry := close
     last_action := fire_buy ? "BUY" : "SELL"
     if show_levels
-        line.delete(ln_sl)
-        line.delete(ln_tp1)
-        line.delete(ln_tp2)
+        if not na(ln_sl)
+            line.delete(ln_sl)
+        if not na(ln_tp1)
+            line.delete(ln_tp1)
+        if not na(ln_tp2)
+            line.delete(ln_tp2)
         ln_sl := line.new(bar_index, sl, bar_index + level_extend, sl, color=color.new(col_bear, 0), style=line.style_dashed, width=1)
         ln_tp1 := line.new(bar_index, tp1, bar_index + level_extend, tp1, color=color.new(col_bull, 30), style=line.style_dotted, width=1)
         ln_tp2 := line.new(bar_index, tp2, bar_index + level_extend, tp2, color=color.new(col_bull, 0), style=line.style_dotted, width=1)

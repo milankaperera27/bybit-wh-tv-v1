@@ -79,8 +79,12 @@ plotshape(show_smc and show_swings and not na(pl), "Swing Low", shape.triangleup
 // A break of the last swing HIGH while the tracked leg is already bullish is a
 // Break Of Structure (continuation). The same break while the tracked leg is
 // bearish/undefined is a Market Structure Shift (the prior leg is invalidated).
-bool bull_break = show_smc and not na(last_sh) and ta.crossover(close, last_sh)
-bool bear_break = show_smc and not na(last_sl) and ta.crossunder(close, last_sl)
+// ta.crossover/ta.crossunder are hoisted out of the `and` chain so they are
+// evaluated on every bar (Pine's logical operators are lazy).
+bool cross_up = ta.crossover(close, last_sh)
+bool cross_dn = ta.crossunder(close, last_sl)
+bool bull_break = show_smc and not na(last_sh) and cross_up
+bool bear_break = show_smc and not na(last_sl) and cross_dn
 
 var int trend_dir = 0          // 1 = bullish leg, -1 = bearish leg, 0 = undefined
 
@@ -141,9 +145,7 @@ if bull_fvg
     float gap_bot = high[2]
     float ce      = (gap_top + gap_bot) / 2.0
     box b = box.new(bar_index - 2, gap_top, bar_index + fvg_extend, gap_bot, bgcolor = color.new(col_bull, 85), border_color = color.new(col_bull, 40))
-    line m = na
-    if show_fvg_mid
-        m := line.new(bar_index - 2, ce, bar_index + fvg_extend, ce, color = color.new(col_bull, 25), style = line.style_dotted, width = 1)
+    line m = line.new(bar_index - 2, ce, bar_index + fvg_extend, ce, color = color.new(col_bull, show_fvg_mid ? 25 : 100), style = line.style_dotted, width = 1)
     array.push(fvg_boxes, b)
     array.push(fvg_mids, m)
     array.push(fvg_ce, ce)
@@ -155,9 +157,7 @@ if bear_fvg
     float sgap_bot = high
     float sce      = (sgap_top + sgap_bot) / 2.0
     box sb = box.new(bar_index - 2, sgap_top, bar_index + fvg_extend, sgap_bot, bgcolor = color.new(col_bear, 85), border_color = color.new(col_bear, 40))
-    line sm = na
-    if show_fvg_mid
-        sm := line.new(bar_index - 2, sce, bar_index + fvg_extend, sce, color = color.new(col_bear, 25), style = line.style_dotted, width = 1)
+    line sm = line.new(bar_index - 2, sce, bar_index + fvg_extend, sce, color = color.new(col_bear, show_fvg_mid ? 25 : 100), style = line.style_dotted, width = 1)
     array.push(fvg_boxes, sb)
     array.push(fvg_mids, sm)
     array.push(fvg_ce, sce)
@@ -185,7 +185,7 @@ if array.size(fvg_boxes) > 0
                     array.set(fvg_mit, i, true)
                     box.set_bgcolor(array.get(fvg_boxes, i), color.new(col_mit, 90))
                     box.set_border_color(array.get(fvg_boxes, i), color.new(col_mit, 60))
-                    line.set_color(array.get(fvg_mids, i), color.new(col_mit, 60))
+                    line.set_color(array.get(fvg_mids, i), color.new(col_mit, show_fvg_mid ? 60 : 100))
             else
                 box.set_right(array.get(fvg_boxes, i), bar_index + fvg_extend)
                 line.set_x2(array.get(fvg_mids, i), bar_index + fvg_extend)
@@ -288,6 +288,14 @@ plot(sweep_high ? 1.0 : 0.0, "sweep_high", display = display.data_window)
 plot(sweep_low ? 1.0 : 0.0, "sweep_low", display = display.data_window)
 
 // secondary (non-contract) diagnostics
+plot(last_sh, "last_swing_high", display = display.data_window)
+plot(last_sl, "last_swing_low", display = display.data_window)
+plot(prev_sh, "prev_swing_high", display = display.data_window)
+plot(prev_sl, "prev_swing_low", display = display.data_window)
+plot(bar_index - last_sh_bar, "bars_since_swing_high", display = display.data_window)
+plot(bar_index - last_sl_bar, "bars_since_swing_low", display = display.data_window)
+plot(liq_high, "liquidity_high", display = display.data_window)
+plot(liq_low, "liquidity_low", display = display.data_window)
 plot(bull_bos ? 1.0 : 0.0, "bull_bos", display = display.data_window)
 plot(bear_bos ? 1.0 : 0.0, "bear_bos", display = display.data_window)
 plot(fvg_mitigated ? 1.0 : 0.0, "fvg_mitigated", display = display.data_window)

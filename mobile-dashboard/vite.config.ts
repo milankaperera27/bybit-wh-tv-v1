@@ -46,6 +46,9 @@ export default defineConfig(({ mode }) => {
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+          // The FCM worker registers itself under its own scope and must stay
+          // updatable independently of the app shell.
+          globIgnores: ['**/firebase-messaging-sw.js'],
           cleanupOutdatedCaches: true,
           clientsClaim: true,
           skipWaiting: true,
