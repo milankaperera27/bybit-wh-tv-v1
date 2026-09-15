@@ -1,0 +1,307 @@
+//@version=6
+// =============================================================================
+// ATLAS — Atlas_SMC_Core.pine
+// Modular Smart Money Concepts engine (LAYER 6 / spec §3)
+//   • Swing pivots            -> last swing high / low
+//   • MSS vs BOS              -> break against prior leg vs continuation break
+//   • Fair Value Gaps         -> boxes + 50% consequent-encroachment midline
+//                                + mitigation tracking
+//   • Order Blocks            -> last opposing candle before the displacement leg
+//   • Liquidity sweeps        -> previous session / previous day high & low
+//                                taken and reclaimed
+// Exports every primitive on display.data_window so sibling scripts (and the
+// TradingView "Data Window" / alert placeholders) can consume the state.
+// =============================================================================
+indicator("Atlas SMC Core [v6]", shorttitle = "ATLAS SMC", overlay = true, max_boxes_count = 500, max_lines_count = 500, max_labels_count = 500)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 0. Inputs
+// ─────────────────────────────────────────────────────────────────────────────
+group_struct = "Market Structure"
+show_smc     = input.bool(true, "Enable SMC Engine", group = group_struct)
+pivot_len    = input.int(5, "Swing Pivot Length", minval = 2, maxval = 20, group = group_struct)
+show_swings  = input.bool(true, "Plot Swing Pivots", group = group_struct)
+show_labels  = input.bool(true, "Label MSS / BOS", group = group_struct)
+
+group_fvg    = "Fair Value Gaps"
+show_fvg     = input.bool(true, "Show Fair Value Gaps", group = group_fvg)
+fvg_extend   = input.int(8, "FVG Box Extension (bars)", minval = 1, maxval = 200, group = group_fvg)
+show_fvg_mid = input.bool(true, "Show FVG 50% Midline (Consequent Encroachment)", group = group_fvg)
+max_fvg      = input.int(20, "Max Live FVG Zones", minval = 1, maxval = 100, group = group_fvg)
+mit_mode     = input.string("Grey Out", "Mitigated FVG Handling", options = ["Grey Out", "Delete"], group = group_fvg)
+
+group_ob     = "Order Blocks"
+show_ob      = input.bool(true, "Show Order Blocks", group = group_ob)
+ob_lookback  = input.int(20, "Displacement Lookback (bars)", minval = 1, maxval = 100, group = group_ob)
+ob_extend    = input.int(20, "Order Block Extension (bars)", minval = 1, maxval = 200, group = group_ob)
+max_ob       = input.int(10, "Max Live Order Blocks", minval = 1, maxval = 50, group = group_ob)
+
+group_liq    = "Liquidity"
+show_liq     = input.bool(true, "Show Liquidity Sweeps", group = group_liq)
+liq_ref      = input.string("Previous Day", "Sweep Reference", options = ["Previous Day", "Previous Session"], group = group_liq)
+liq_session  = input.session("0930-1600", "Session Window (Previous Session mode)", group = group_liq)
+draw_liq     = input.bool(true, "Draw Reference Liquidity Lines", group = group_liq)
+
+group_col    = "Colours"
+col_bull     = input.color(#089981, "Bullish", group = group_col)
+col_bear     = input.color(#f23645, "Bearish", group = group_col)
+col_mit      = input.color(#787b86, "Mitigated", group = group_col)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. Swing pivots — last confirmed swing high / low
+// ─────────────────────────────────────────────────────────────────────────────
+float ph = ta.pivothigh(high, pivot_len, pivot_len)
+float pl = ta.pivotlow(low, pivot_len, pivot_len)
+
+var float last_sh = na
+var float last_sl = na
+var float prev_sh = na
+var float prev_sl = na
+var int   last_sh_bar = na
+var int   last_sl_bar = na
+
+if not na(ph)
+    prev_sh     := last_sh
+    last_sh     := high[pivot_len]
+    last_sh_bar := bar_index - pivot_len
+
+if not na(pl)
+    prev_sl     := last_sl
+    last_sl     := low[pivot_len]
+    last_sl_bar := bar_index - pivot_len
+
+plotshape(show_smc and show_swings and not na(ph), "Swing High", shape.triangledown, location.abovebar, col_bear, offset = -pivot_len, size = size.tiny)
+plotshape(show_smc and show_swings and not na(pl), "Swing Low", shape.triangleup, location.belowbar, col_bull, offset = -pivot_len, size = size.tiny)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2. Market Structure — BOS (continuation) vs MSS (shift against the prior leg)
+// ─────────────────────────────────────────────────────────────────────────────
+// A break of the last swing HIGH while the tracked leg is already bullish is a
+// Break Of Structure (continuation). The same break while the tracked leg is
+// bearish/undefined is a Market Structure Shift (the prior leg is invalidated).
+bool bull_break = show_smc and not na(last_sh) and ta.crossover(close, last_sh)
+bool bear_break = show_smc and not na(last_sl) and ta.crossunder(close, last_sl)
+
+var int trend_dir = 0          // 1 = bullish leg, -1 = bearish leg, 0 = undefined
+
+bool bull_bos = false
+bool bear_bos = false
+bool bull_mss = false
+bool bear_mss = false
+
+if bull_break
+    if trend_dir == 1
+        bull_bos := true
+    else
+        bull_mss := true
+    trend_dir := 1
+
+if bear_break
+    if trend_dir == -1
+        bear_bos := true
+    else
+        bear_mss := true
+    trend_dir := -1
+
+if show_labels and show_smc
+    if bull_mss
+        label.new(bar_index, low, "MSS", style = label.style_label_up, color = col_bull, textcolor = color.white, size = size.tiny)
+    if bull_bos
+        label.new(bar_index, low, "BOS", style = label.style_label_up, color = color.new(col_bull, 40), textcolor = color.white, size = size.tiny)
+    if bear_mss
+        label.new(bar_index, high, "MSS", style = label.style_label_down, color = col_bear, textcolor = color.white, size = size.tiny)
+    if bear_bos
+        label.new(bar_index, high, "BOS", style = label.style_label_down, color = color.new(col_bear, 40), textcolor = color.white, size = size.tiny)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. Fair Value Gaps + mitigation at the 50% consequent encroachment
+// ─────────────────────────────────────────────────────────────────────────────
+bool bull_fvg = show_smc and show_fvg and (low > high[2])
+bool bear_fvg = show_smc and show_fvg and (high < low[2])
+
+var array<box>   fvg_boxes = array.new<box>()
+var array<line>  fvg_mids  = array.new<line>()
+var array<float> fvg_ce    = array.new<float>()
+var array<int>   fvg_dir   = array.new<int>()
+var array<bool>  fvg_mit   = array.new<bool>()
+
+// helper: drop the FVG living at index i from every parallel array
+f_drop_fvg(int i) =>
+    box.delete(array.get(fvg_boxes, i))
+    line.delete(array.get(fvg_mids, i))
+    array.remove(fvg_boxes, i)
+    array.remove(fvg_mids, i)
+    array.remove(fvg_ce, i)
+    array.remove(fvg_dir, i)
+    array.remove(fvg_mit, i)
+    i
+
+if bull_fvg
+    float gap_top = low
+    float gap_bot = high[2]
+    float ce      = (gap_top + gap_bot) / 2.0
+    box b = box.new(bar_index - 2, gap_top, bar_index + fvg_extend, gap_bot, bgcolor = color.new(col_bull, 85), border_color = color.new(col_bull, 40))
+    line m = na
+    if show_fvg_mid
+        m := line.new(bar_index - 2, ce, bar_index + fvg_extend, ce, color = color.new(col_bull, 25), style = line.style_dotted, width = 1)
+    array.push(fvg_boxes, b)
+    array.push(fvg_mids, m)
+    array.push(fvg_ce, ce)
+    array.push(fvg_dir, 1)
+    array.push(fvg_mit, false)
+
+if bear_fvg
+    float sgap_top = low[2]
+    float sgap_bot = high
+    float sce      = (sgap_top + sgap_bot) / 2.0
+    box sb = box.new(bar_index - 2, sgap_top, bar_index + fvg_extend, sgap_bot, bgcolor = color.new(col_bear, 85), border_color = color.new(col_bear, 40))
+    line sm = na
+    if show_fvg_mid
+        sm := line.new(bar_index - 2, sce, bar_index + fvg_extend, sce, color = color.new(col_bear, 25), style = line.style_dotted, width = 1)
+    array.push(fvg_boxes, sb)
+    array.push(fvg_mids, sm)
+    array.push(fvg_ce, sce)
+    array.push(fvg_dir, -1)
+    array.push(fvg_mit, false)
+
+// cap the pool so box.new / line.new never exceed max_boxes_count / max_lines_count
+while array.size(fvg_boxes) > max_fvg
+    f_drop_fvg(0)
+
+// mitigation scan — iterate backwards so removals never shift an unvisited index
+bool fvg_mitigated = false
+if array.size(fvg_boxes) > 0
+    for i = array.size(fvg_boxes) - 1 to 0
+        bool already = array.get(fvg_mit, i)
+        int   dir    = array.get(fvg_dir, i)
+        float ce_lvl = array.get(fvg_ce, i)
+        if not already
+            bool hit = dir == 1 ? (low <= ce_lvl) : (high >= ce_lvl)
+            if hit
+                fvg_mitigated := true
+                if mit_mode == "Delete"
+                    f_drop_fvg(i)
+                else
+                    array.set(fvg_mit, i, true)
+                    box.set_bgcolor(array.get(fvg_boxes, i), color.new(col_mit, 90))
+                    box.set_border_color(array.get(fvg_boxes, i), color.new(col_mit, 60))
+                    line.set_color(array.get(fvg_mids, i), color.new(col_mit, 60))
+            else
+                box.set_right(array.get(fvg_boxes, i), bar_index + fvg_extend)
+                line.set_x2(array.get(fvg_mids, i), bar_index + fvg_extend)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. Order Blocks — last opposing candle before the displacement leg that
+//    produced the MSS / BOS
+// ─────────────────────────────────────────────────────────────────────────────
+var array<box> ob_boxes = array.new<box>()
+
+bool bull_ob = false
+bool bear_ob = false
+
+if show_smc and show_ob and (bull_mss or bull_bos)
+    int idx = -1
+    int lim = math.min(ob_lookback, bar_index)
+    if lim >= 1
+        for i = 1 to lim
+            if close[i] < open[i]
+                idx := i
+                break
+    if idx >= 0
+        box ob = box.new(bar_index - idx, high[idx], bar_index + ob_extend, low[idx], bgcolor = color.new(col_bull, 80), border_color = color.new(col_bull, 20), text = "OB", text_color = color.new(col_bull, 0), text_size = size.tiny)
+        array.push(ob_boxes, ob)
+        bull_ob := true
+
+if show_smc and show_ob and (bear_mss or bear_bos)
+    int sidx = -1
+    int slim = math.min(ob_lookback, bar_index)
+    if slim >= 1
+        for i = 1 to slim
+            if close[i] > open[i]
+                sidx := i
+                break
+    if sidx >= 0
+        box sob = box.new(bar_index - sidx, high[sidx], bar_index + ob_extend, low[sidx], bgcolor = color.new(col_bear, 80), border_color = color.new(col_bear, 20), text = "OB", text_color = color.new(col_bear, 0), text_size = size.tiny)
+        array.push(ob_boxes, sob)
+        bear_ob := true
+
+while array.size(ob_boxes) > max_ob
+    box.delete(array.get(ob_boxes, 0))
+    array.remove(ob_boxes, 0)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. Liquidity — previous day / previous session high & low, swept and reclaimed
+// ─────────────────────────────────────────────────────────────────────────────
+float pdh = request.security(syminfo.tickerid, "D", high[1], lookahead = barmerge.lookahead_off)
+float pdl = request.security(syminfo.tickerid, "D", low[1], lookahead = barmerge.lookahead_off)
+
+bool in_sess    = not na(time(timeframe.period, liq_session))
+bool sess_open  = in_sess and not in_sess[1]
+bool sess_close = not in_sess and in_sess[1]
+
+var float cur_sess_h  = na
+var float cur_sess_l  = na
+var float prev_sess_h = na
+var float prev_sess_l = na
+
+if sess_open
+    cur_sess_h := high
+    cur_sess_l := low
+else if in_sess
+    cur_sess_h := math.max(nz(cur_sess_h, high), high)
+    cur_sess_l := math.min(nz(cur_sess_l, low), low)
+
+if sess_close
+    prev_sess_h := cur_sess_h
+    prev_sess_l := cur_sess_l
+
+float liq_high = liq_ref == "Previous Day" ? pdh : prev_sess_h
+float liq_low  = liq_ref == "Previous Day" ? pdl : prev_sess_l
+
+// a sweep = the level is taken intrabar and then reclaimed on the close
+bool sweep_high = show_smc and show_liq and not na(liq_high) and high > liq_high and close < liq_high
+bool sweep_low  = show_smc and show_liq and not na(liq_low) and low < liq_low and close > liq_low
+
+plot(draw_liq and show_liq ? liq_high : na, "Liquidity High", color = color.new(col_bear, 45), style = plot.style_linebr, linewidth = 1)
+plot(draw_liq and show_liq ? liq_low : na, "Liquidity Low", color = color.new(col_bull, 45), style = plot.style_linebr, linewidth = 1)
+
+plotshape(sweep_high, "Sweep High", shape.xcross, location.abovebar, col_bear, size = size.tiny)
+plotshape(sweep_low, "Sweep Low", shape.xcross, location.belowbar, col_bull, size = size.tiny)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. Structure reference plots
+// ─────────────────────────────────────────────────────────────────────────────
+plot(show_smc and show_swings ? last_sh : na, "Last Swing High", color = color.new(col_bear, 70), style = plot.style_stepline, linewidth = 1)
+plot(show_smc and show_swings ? last_sl : na, "Last Swing Low", color = color.new(col_bull, 70), style = plot.style_stepline, linewidth = 1)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7. STATE EXPORT — consumed by Atlas_Execution_Suite.pine, the Data Window and
+//    {{plot("...")}} alert placeholders.
+// ─────────────────────────────────────────────────────────────────────────────
+plot(bull_mss ? 1.0 : 0.0, "bull_mss", display = display.data_window)
+plot(bear_mss ? 1.0 : 0.0, "bear_mss", display = display.data_window)
+plot(bull_fvg ? 1.0 : 0.0, "bull_fvg", display = display.data_window)
+plot(bear_fvg ? 1.0 : 0.0, "bear_fvg", display = display.data_window)
+plot(bull_ob ? 1.0 : 0.0, "bull_ob", display = display.data_window)
+plot(bear_ob ? 1.0 : 0.0, "bear_ob", display = display.data_window)
+plot(sweep_high ? 1.0 : 0.0, "sweep_high", display = display.data_window)
+plot(sweep_low ? 1.0 : 0.0, "sweep_low", display = display.data_window)
+
+// secondary (non-contract) diagnostics
+plot(bull_bos ? 1.0 : 0.0, "bull_bos", display = display.data_window)
+plot(bear_bos ? 1.0 : 0.0, "bear_bos", display = display.data_window)
+plot(fvg_mitigated ? 1.0 : 0.0, "fvg_mitigated", display = display.data_window)
+plot(trend_dir, "trend_dir", display = display.data_window)
+plot(array.size(fvg_boxes), "live_fvg_count", display = display.data_window)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 8. Alert conditions (UI wiring)
+// ─────────────────────────────────────────────────────────────────────────────
+alertcondition(bull_mss, "ATLAS SMC — Bullish MSS", "Bullish Market Structure Shift on {{ticker}} {{interval}}")
+alertcondition(bear_mss, "ATLAS SMC — Bearish MSS", "Bearish Market Structure Shift on {{ticker}} {{interval}}")
+alertcondition(bull_bos, "ATLAS SMC — Bullish BOS", "Bullish Break Of Structure on {{ticker}} {{interval}}")
+alertcondition(bear_bos, "ATLAS SMC — Bearish BOS", "Bearish Break Of Structure on {{ticker}} {{interval}}")
+alertcondition(bull_fvg, "ATLAS SMC — Bullish FVG", "Bullish Fair Value Gap formed on {{ticker}} {{interval}}")
+alertcondition(bear_fvg, "ATLAS SMC — Bearish FVG", "Bearish Fair Value Gap formed on {{ticker}} {{interval}}")
+alertcondition(sweep_high, "ATLAS SMC — Liquidity Sweep High", "Sell-side reclaim after taking highs on {{ticker}} {{interval}}")
+alertcondition(sweep_low, "ATLAS SMC — Liquidity Sweep Low", "Buy-side reclaim after taking lows on {{ticker}} {{interval}}")
