@@ -1,0 +1,89 @@
+# ATLAS Autonomous Trading System — LAYER 0 infrastructure
+# Spec §1 (topology) / §6 (repository structure)
+#   redis     : 60-second TTL hold for PENDING_APPROVAL setups + kill-switch flag
+#   postgres  : durable audit ledger (signals, confirmations, fills, agent runs)
+#   backend   : FastAPI execution middleware & WebSocket hub
+
+name: atlas
+
+services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: atlas-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 256mb
+      --maxmemory-policy noeviction
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks: [atlas_net]
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: atlas-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-atlas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-atlas_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-atlas}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/sql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-atlas} -d ${POSTGRES_DB:-atlas}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks: [atlas_net]
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: atlas-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      ATLAS_REDIS_URL: redis://redis:6379/0
+      ATLAS_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-atlas}:${POSTGRES_PASSWORD:-atlas_dev_password}@postgres:5432/${POSTGRES_DB:-atlas}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/v1/health').status==200 else 1)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks: [atlas_net]
+
+volumes:
+  redis_data:
+    name: atlas_redis_data
+  postgres_data:
+    name: atlas_postgres_data
+
+networks:
+  atlas_net:
+    name: atlas_net
+    driver: bridge

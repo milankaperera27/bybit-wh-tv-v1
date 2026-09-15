@@ -1,0 +1,44 @@
+# ── Secrets ──
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+*.egg-info/
+
+# ── Node / PWA ──
+node_modules/
+dist/
+build/
+.vite/
+*.local
+
+# ── Capacitor / Android ──
+mobile-dashboard/android/
+mobile-dashboard/ios/
+*.keystore
+
+# ── Data & artifacts ──
+data/
+*.db
+*.sqlite3
+logs/
+*.log
+backtest_results/
+
+# ── Editors / OS ──
+.idea/
+.vscode/
+.DS_Store
