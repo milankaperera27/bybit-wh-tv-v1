@@ -1,0 +1,185 @@
+//@version=6
+// =============================================================================
+// ATLAS — Atlas_Regime_Filter.pine
+// Modular market-regime classifier (LAYER 6 / spec §3, agent 1 of §2)
+//
+// Classifier (spec §3.1, verbatim if / else-if ordering):
+//     if   adx > threshold and close > ema200 and ema50 > ema200 -> BULL_TREND_EXPANSION
+//     else if adx > threshold and close < ema200 and ema50 < ema200 -> BEAR_TREND_EXPANSION
+//     else if adx <= threshold and not vol_expansion               -> RANGE_COMPRESSION
+//     else                                                         -> VOLATILITY_CHOP
+//
+// Multi-timeframe radar: the *same* classifier is evaluated on 5m / 1h / Daily
+// through request.security with lookahead_off and a confirmed-bar ([1]) value,
+// so the higher-timeframe states never repaint.
+// =============================================================================
+indicator("Atlas Regime Filter [v6]", shorttitle = "ATLAS REGIME", overlay = true, max_boxes_count = 500, max_lines_count = 500)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 0. Inputs
+// ─────────────────────────────────────────────────────────────────────────────
+group_regime  = "Market Regime Filter"
+adx_len       = input.int(14, "ADX Length", minval = 2, maxval = 100, group = group_regime)
+adx_threshold = input.int(22, "ADX Trend Threshold", minval = 5, maxval = 60, group = group_regime)
+ema_fast_len  = input.int(50, "Fast EMA Length", minval = 2, maxval = 400, group = group_regime)
+ema_slow_len  = input.int(200, "Slow EMA Length", minval = 2, maxval = 800, group = group_regime)
+atr_len       = input.int(14, "ATR Length", minval = 2, maxval = 200, group = group_regime)
+atr_ma_len    = input.int(50, "ATR Baseline (SMA) Length", minval = 2, maxval = 400, group = group_regime)
+atr_pctl_len  = input.int(100, "ATR Percentile Lookback", minval = 10, maxval = 1000, group = group_regime)
+
+group_mtf     = "Multi-Timeframe Radar"
+show_radar    = input.bool(true, "Show Regime Radar Table", group = group_mtf)
+tf_ltf        = input.timeframe("5", "Low Timeframe", group = group_mtf)
+tf_mtf        = input.timeframe("60", "Mid Timeframe", group = group_mtf)
+tf_htf        = input.timeframe("D", "High Timeframe", group = group_mtf)
+
+group_view    = "Display"
+paint_bg      = input.bool(false, "Tint Background By Chart Regime", group = group_view)
+show_emas     = input.bool(true, "Plot EMA 50 / EMA 200 Stack", group = group_view)
+tbl_size      = input.string("small", "Table Text Size", options = ["tiny", "small", "normal", "large"], group = group_view)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. Regime codes
+//    1 = BULL_TREND_EXPANSION   2 = BEAR_TREND_EXPANSION
+//    3 = RANGE_COMPRESSION      4 = VOLATILITY_CHOP      0 = NEUTRAL / warm-up
+// ─────────────────────────────────────────────────────────────────────────────
+f_regime_name(int code) =>
+    string out = code == 1 ? "BULL_TREND_EXPANSION" : code == 2 ? "BEAR_TREND_EXPANSION" : code == 3 ? "RANGE_COMPRESSION" : code == 4 ? "VOLATILITY_CHOP" : "NEUTRAL"
+    out
+
+f_regime_color(int code) =>
+    color out = code == 1 ? #089981 : code == 2 ? #f23645 : code == 3 ? #2962ff : code == 4 ? #ff9800 : #787b86
+    out
+
+// The classifier. Returns [live_code, confirmed_code] where confirmed_code is
+// the value of the previous *closed* bar in whatever context it is evaluated in.
+// The previous value is carried in a `var` rather than through the history
+// operator so the function is safe to call from inside request.security().
+f_regime() =>
+    float ef     = ta.ema(close, ema_fast_len)
+    float es     = ta.ema(close, ema_slow_len)
+    [di_p, di_m, adx_v] = ta.dmi(adx_len, adx_len)
+    float atr_v  = ta.atr(atr_len)
+    float atr_ma = ta.sma(atr_v, atr_ma_len)
+    bool  vol_exp = atr_v > atr_ma
+    int code = 0
+    if adx_v > adx_threshold and close > es and ef > es
+        code := 1
+    else if adx_v > adx_threshold and close < es and ef < es
+        code := 2
+    else if adx_v <= adx_threshold and not vol_exp
+        code := 3
+    else
+        code := 4
+    var int carried = 0
+    int confirmed = carried
+    carried := code
+    [code, confirmed, adx_v, atr_v, di_p, di_m]
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2. Chart-timeframe evaluation
+// ─────────────────────────────────────────────────────────────────────────────
+[chart_code, chart_confirmed, adx_val, atr_val, dip_val, dim_val] = f_regime()
+
+float ema_fast = ta.ema(close, ema_fast_len)
+float ema_slow = ta.ema(close, ema_slow_len)
+float atr_base = ta.sma(atr_val, atr_ma_len)
+bool  vol_expansion = atr_val > atr_base
+float atr_pctl = ta.percentrank(atr_val, atr_pctl_len)
+
+var string market_regime = "NEUTRAL"
+market_regime := f_regime_name(chart_code)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. Multi-timeframe radar (non-repainting: lookahead_off + confirmed value)
+// ─────────────────────────────────────────────────────────────────────────────
+f_mtf_code() =>
+    [_c, conf, _a, _t, _p, _m] = f_regime()
+    conf
+
+int ltf_code = request.security(syminfo.tickerid, tf_ltf, f_mtf_code(), lookahead = barmerge.lookahead_off)
+int mtf_code = request.security(syminfo.tickerid, tf_mtf, f_mtf_code(), lookahead = barmerge.lookahead_off)
+int htf_code = request.security(syminfo.tickerid, tf_htf, f_mtf_code(), lookahead = barmerge.lookahead_off)
+
+int ltf_safe = nz(ltf_code, 0)
+int mtf_safe = nz(mtf_code, 0)
+int htf_safe = nz(htf_code, 0)
+
+// alignment score: +1 per bullish TF, -1 per bearish TF (range -3 .. +3)
+f_align(int code) =>
+    int out = code == 1 ? 1 : code == 2 ? -1 : 0
+    out
+
+int mtf_alignment = f_align(ltf_safe) + f_align(mtf_safe) + f_align(htf_safe)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. Rendering
+// ─────────────────────────────────────────────────────────────────────────────
+plot(show_emas ? ema_fast : na, "EMA 50", color = color.new(#2962ff, 0), linewidth = 1)
+plot(show_emas ? ema_slow : na, "EMA 200", color = color.new(#ff6d00, 0), linewidth = 2)
+
+bgcolor(paint_bg ? color.new(f_regime_color(chart_code), 92) : na, title = "Regime Tint")
+
+f_txt_size(string s) =>
+    string out = s == "tiny" ? size.tiny : s == "normal" ? size.normal : s == "large" ? size.large : size.small
+    out
+
+var table radar = table.new(position.top_right, 3, 6, border_width = 1, frame_width = 1, frame_color = color.new(#787b86, 40))
+
+if show_radar and barstate.islast
+    string ts = f_txt_size(tbl_size)
+    table.cell(radar, 0, 0, "ATLAS REGIME RADAR", text_color = color.white, bgcolor = color.new(#2a2e39, 0), text_size = ts)
+    table.cell(radar, 1, 0, "", bgcolor = color.new(#2a2e39, 0))
+    table.cell(radar, 2, 0, "ADX", text_color = color.white, bgcolor = color.new(#2a2e39, 0), text_size = ts)
+
+    table.cell(radar, 0, 1, "CHART " + timeframe.period, text_color = color.white, bgcolor = color.new(#363a45, 0), text_size = ts)
+    table.cell(radar, 1, 1, market_regime, text_color = color.white, bgcolor = color.new(f_regime_color(chart_code), 25), text_size = ts)
+    table.cell(radar, 2, 1, str.tostring(adx_val, "#.#"), text_color = color.white, bgcolor = color.new(#363a45, 0), text_size = ts)
+
+    table.cell(radar, 0, 2, "LTF " + tf_ltf, text_color = color.white, bgcolor = color.new(#363a45, 0), text_size = ts)
+    table.cell(radar, 1, 2, f_regime_name(ltf_safe), text_color = color.white, bgcolor = color.new(f_regime_color(ltf_safe), 25), text_size = ts)
+    table.cell(radar, 2, 2, "", bgcolor = color.new(#363a45, 0))
+
+    table.cell(radar, 0, 3, "MTF " + tf_mtf, text_color = color.white, bgcolor = color.new(#363a45, 0), text_size = ts)
+    table.cell(radar, 1, 3, f_regime_name(mtf_safe), text_color = color.white, bgcolor = color.new(f_regime_color(mtf_safe), 25), text_size = ts)
+    table.cell(radar, 2, 3, "", bgcolor = color.new(#363a45, 0))
+
+    table.cell(radar, 0, 4, "HTF " + tf_htf, text_color = color.white, bgcolor = color.new(#363a45, 0), text_size = ts)
+    table.cell(radar, 1, 4, f_regime_name(htf_safe), text_color = color.white, bgcolor = color.new(f_regime_color(htf_safe), 25), text_size = ts)
+    table.cell(radar, 2, 4, "", bgcolor = color.new(#363a45, 0))
+
+    table.cell(radar, 0, 5, "ATR PCTL / ALIGN", text_color = color.white, bgcolor = color.new(#363a45, 0), text_size = ts)
+    table.cell(radar, 1, 5, str.tostring(atr_pctl, "#.#") + "%  |  " + str.tostring(mtf_alignment), text_color = color.white, bgcolor = color.new(vol_expansion ? #ff9800 : #363a45, 25), text_size = ts)
+    table.cell(radar, 2, 5, vol_expansion ? "EXP" : "CMP", text_color = color.white, bgcolor = color.new(#363a45, 0), text_size = ts)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. STATE EXPORT — numeric regime codes for downstream scripts / Data Window
+// ─────────────────────────────────────────────────────────────────────────────
+plot(chart_code, "regime_code", display = display.data_window)
+plot(chart_confirmed, "regime_code_confirmed", display = display.data_window)
+plot(ltf_safe, "regime_code_ltf", display = display.data_window)
+plot(mtf_safe, "regime_code_mtf", display = display.data_window)
+plot(htf_safe, "regime_code_htf", display = display.data_window)
+plot(mtf_alignment, "mtf_alignment", display = display.data_window)
+plot(adx_val, "adx", display = display.data_window)
+plot(dip_val, "di_plus", display = display.data_window)
+plot(dim_val, "di_minus", display = display.data_window)
+plot(atr_val, "atr", display = display.data_window)
+plot(atr_base, "atr_sma50", display = display.data_window)
+plot(atr_pctl, "atr_percentile", display = display.data_window)
+plot(vol_expansion ? 1.0 : 0.0, "vol_expansion", display = display.data_window)
+plot(ema_fast, "ema_fast", display = display.data_window)
+plot(ema_slow, "ema_slow", display = display.data_window)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. Alert conditions (UI wiring)
+// ─────────────────────────────────────────────────────────────────────────────
+bool is_bull_exp = chart_code == 1
+bool is_bear_exp = chart_code == 2
+bool is_range    = chart_code == 3
+bool is_chop     = chart_code == 4
+
+alertcondition(is_bull_exp and not is_bull_exp[1], "ATLAS REGIME — BULL_TREND_EXPANSION", "BULL_TREND_EXPANSION on {{ticker}} {{interval}}")
+alertcondition(is_bear_exp and not is_bear_exp[1], "ATLAS REGIME — BEAR_TREND_EXPANSION", "BEAR_TREND_EXPANSION on {{ticker}} {{interval}}")
+alertcondition(is_range and not is_range[1], "ATLAS REGIME — RANGE_COMPRESSION", "RANGE_COMPRESSION on {{ticker}} {{interval}}")
+alertcondition(is_chop and not is_chop[1], "ATLAS REGIME — VOLATILITY_CHOP", "VOLATILITY_CHOP on {{ticker}} {{interval}}")

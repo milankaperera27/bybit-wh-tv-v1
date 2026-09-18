@@ -1,0 +1,200 @@
+/* RegimeRadar — 5m / 1h / Daily heatmap with ADX + ATR gauges. */
+
+.radar {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+}
+
+.radar__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.radar__title {
+  font-size: 12px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.radar__meta { display: flex; align-items: center; gap: 8px; }
+
+.radar__symbol {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.radar__stale {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--warn) 18%, transparent);
+  color: var(--warn);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.radar__stale-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 1.1s ease-in-out infinite;
+}
+
+.radar__empty {
+  padding: 16px 0;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.radar__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.radar-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 9px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  min-width: 0;
+}
+
+.radar-cell__top { display: flex; align-items: center; justify-content: space-between; }
+
+.radar-cell__tf {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.radar-cell__staleflag {
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--warn);
+  color: #000;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.radar-cell__regime {
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+/* Regime colour coding — the heatmap itself. */
+.radar-cell--bull { border-color: color-mix(in srgb, var(--regime-bull) 48%, transparent); background: color-mix(in srgb, var(--regime-bull) 10%, var(--bg-card)); }
+.radar-cell--bull .radar-cell__regime { color: var(--regime-bull); }
+
+.radar-cell--bear { border-color: color-mix(in srgb, var(--regime-bear) 48%, transparent); background: color-mix(in srgb, var(--regime-bear) 10%, var(--bg-card)); }
+.radar-cell--bear .radar-cell__regime { color: var(--regime-bear); }
+
+.radar-cell--range { border-color: color-mix(in srgb, var(--regime-range) 48%, transparent); background: color-mix(in srgb, var(--regime-range) 10%, var(--bg-card)); }
+.radar-cell--range .radar-cell__regime { color: var(--regime-range); }
+
+.radar-cell--chop { border-color: color-mix(in srgb, var(--regime-chop) 48%, transparent); background: color-mix(in srgb, var(--regime-chop) 10%, var(--bg-card)); }
+.radar-cell--chop .radar-cell__regime { color: var(--regime-chop); }
+
+.radar-cell--empty { opacity: 0.45; }
+.radar-cell--empty .radar-cell__regime { color: var(--text-faint); }
+
+/* A stale cell is desaturated and hatched — never silently trusted. */
+.radar-cell.is-stale {
+  filter: saturate(0.35);
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 5px,
+    rgb(255 255 255 / 4%) 5px 10px
+  );
+}
+
+/* ── Gauges ──────────────────────────────────────────────────────────────── */
+
+.gauge { display: flex; flex-direction: column; gap: 3px; }
+
+.gauge__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.gauge__label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+
+.gauge__value {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
+.gauge__value.is-trending { color: var(--text); font-weight: 700; }
+.gauge__pct { color: var(--text-faint); font-size: 9px; }
+
+.gauge__track {
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-input);
+  overflow: hidden;
+}
+
+.gauge__fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--text-faint);
+  transition: width 400ms ease;
+}
+
+.gauge__fill--trend { background: currentColor; }
+.gauge__fill--atr { background: var(--regime-chop); }
+
+/* ADX trend threshold marker (22 by default, matching the Pine input). */
+.gauge__threshold {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 1px;
+  background: var(--text);
+  opacity: 0.55;
+}
+
+.radar-cell__cvd {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-faint);
+}
+
+.radar-cell__cvd.is-up { color: var(--ok); }
+.radar-cell__cvd.is-down { color: var(--bad); }

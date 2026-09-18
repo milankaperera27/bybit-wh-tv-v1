@@ -1,0 +1,143 @@
+/* KillSwitchButton — deliberately unmistakable.
+ * Hazard stripes, full-bleed width, and nothing else shares its colour.
+ */
+
+.killswitch { display: flex; flex-direction: column; gap: 6px; }
+
+.killswitch__hold {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 58px;
+  border-radius: var(--radius);
+  border: 2px solid var(--bad);
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, var(--bad) 22%, transparent) 0 11px,
+      transparent 11px 22px
+    ),
+    var(--bg-card);
+  color: var(--bad);
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.killswitch__hold:disabled { opacity: 0.45; }
+
+/* Fill sweeps left-to-right over the 2s hold. */
+.killswitch__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--bad);
+  opacity: 0.85;
+  transition: width 60ms linear;
+}
+
+.killswitch__hold-label {
+  position: relative;
+  z-index: 1;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.killswitch__hold.is-holding .killswitch__hold-label { color: #fff; }
+
+.killswitch__hint {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.killswitch__hint--warn { color: var(--warn); font-weight: 600; }
+
+/* ── Armed ───────────────────────────────────────────────────────────────── */
+
+.killswitch--armed { animation: armed-flash 700ms ease-in-out infinite; }
+
+.killswitch__armed-row { display: flex; gap: 8px; }
+
+.killswitch__confirm {
+  flex: 1 1 auto;
+  min-height: 58px;
+  border-radius: var(--radius);
+  background: var(--bad);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+}
+
+.killswitch__confirm:active:not(:disabled) { transform: scale(0.98); }
+.killswitch__confirm:disabled { opacity: 0.6; }
+
+.killswitch__cancel {
+  flex: 0 0 auto;
+  min-width: 88px;
+  min-height: 58px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-input);
+  color: var(--text-dim);
+  font-weight: 700;
+}
+
+@keyframes armed-flash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.72; }
+}
+
+/* ── Engaged ─────────────────────────────────────────────────────────────── */
+
+.killswitch--engaged {
+  padding: 10px;
+  border-radius: var(--radius);
+  border: 2px solid var(--bad);
+  background: color-mix(in srgb, var(--bad) 16%, var(--bg-card));
+}
+
+.killswitch__banner { display: flex; align-items: center; gap: 10px; }
+
+.killswitch__siren {
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--bad);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--bad) 70%, transparent);
+  animation: siren 1.4s ease-out infinite;
+}
+
+@keyframes siren {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--bad) 70%, transparent); }
+  70% { box-shadow: 0 0 0 13px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.killswitch__headline {
+  display: block;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: var(--bad);
+}
+
+.killswitch__detail { font-size: 11px; color: var(--text-dim); }
+
+.killswitch__release {
+  width: 100%;
+  min-height: var(--tap);
+  margin-top: 9px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-input);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.killswitch__release:disabled { opacity: 0.5; }

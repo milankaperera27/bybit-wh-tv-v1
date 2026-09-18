@@ -1,0 +1,234 @@
+/* PendingSetupCard — the 60-second decision surface.
+ * The three action buttons are deliberately oversized: they are the only thing
+ * on the screen that must be hittable without looking.
+ */
+
+.setup-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 13px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-card);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 40%);
+  overflow: hidden;
+}
+
+/* Side rail encodes the direction at a glance. */
+.setup-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+}
+
+.setup-card--buy::before { background: var(--ok); }
+.setup-card--sell::before { background: var(--bad); }
+
+.setup-card--urgent {
+  border-color: color-mix(in srgb, var(--warn) 60%, transparent);
+  animation: urgent-glow 1s ease-in-out infinite;
+}
+
+.setup-card--expired,
+.setup-card--sent { opacity: 0.55; }
+
+@keyframes urgent-glow {
+  0%, 100% { box-shadow: 0 8px 24px rgb(0 0 0 / 40%); }
+  50% { box-shadow: 0 8px 30px color-mix(in srgb, var(--warn) 30%, transparent); }
+}
+
+.setup-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.setup-card__identity { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+
+.setup-card__symbol-row { display: flex; align-items: center; gap: 8px; }
+
+.setup-card__symbol {
+  font-size: 23px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  font-family: var(--mono);
+}
+
+.setup-card__tags { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ── Countdown ring ──────────────────────────────────────────────────────── */
+
+.ring { position: relative; flex: 0 0 auto; width: 64px; height: 64px; }
+
+.ring__track { stroke: var(--border); }
+
+.ring__sweep {
+  stroke: var(--ok);
+  transition: stroke 300ms linear;
+}
+
+.ring--calm .ring__sweep { stroke: var(--ok); }
+.ring--warm .ring__sweep { stroke: var(--warn); }
+.ring--urgent .ring__sweep { stroke: var(--bad); }
+
+.ring__value {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 21px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.ring--urgent .ring__value { color: var(--bad); }
+
+/* ── Price levels ────────────────────────────────────────────────────────── */
+
+.setup-card__levels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.level {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  border: 1px solid transparent;
+}
+
+.level dt {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.level dd {
+  margin-top: 2px;
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.level--stop { border-color: color-mix(in srgb, var(--bad) 32%, transparent); }
+.level--stop dd { color: var(--bad); }
+.level--target { border-color: color-mix(in srgb, var(--ok) 26%, transparent); }
+.level--target dd { color: var(--ok); }
+
+.level__r {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--ok) 18%, transparent);
+  color: var(--ok);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* ── Risk line ───────────────────────────────────────────────────────────── */
+
+.setup-card__risk {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.risk__pct { font-weight: 700; color: var(--warn); }
+.risk__dollars { font-weight: 700; color: var(--bad); }
+.risk__reward { font-weight: 700; color: var(--ok); }
+.risk__qty { color: var(--text-dim); }
+.risk__sep { color: var(--text-faint); }
+
+.setup-card__warning {
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bad) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--bad) 40%, transparent);
+  color: var(--bad);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ── Actions ─────────────────────────────────────────────────────────────── */
+
+.setup-card__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-height: var(--tap);
+  padding: 9px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-weight: 750;
+  transition: transform 90ms ease, opacity 120ms ease;
+}
+
+.action:active:not(:disabled) { transform: scale(0.975); }
+
+.action:disabled { opacity: 0.4; }
+
+.action__label { font-size: 14px; line-height: 1.15; }
+.action__sub { font-size: 10px; opacity: 0.72; font-weight: 600; letter-spacing: 0.04em; }
+
+.action--tradovate {
+  background: var(--tradovate);
+  color: #fff;
+}
+
+.action--kraken {
+  background: var(--kraken);
+  color: #fff;
+}
+
+/* Reject spans the full width beneath the two confirm buttons, so a thumb
+ * reaching for "confirm" never lands on it by accident. */
+.action--reject {
+  grid-column: 1 / -1;
+  min-height: 46px;
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--text-dim);
+}
+
+.action--reject:active:not(:disabled) { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
+
+.action.is-pressed { outline: 2px solid var(--text); outline-offset: 1px; }
+
+.setup-card__terminal {
+  padding: 9px;
+  border-radius: var(--radius-sm);
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.setup-card__terminal--expired { background: var(--bg-input); color: var(--text-faint); }
+.setup-card__terminal--sent { background: color-mix(in srgb, var(--info) 16%, transparent); color: var(--info); }

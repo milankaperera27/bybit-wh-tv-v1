@@ -1,0 +1,19 @@
+# ── ATLAS backend (LAYER 1-5) ──────────────────────────────────────────────
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2.7
+pydantic-settings>=2.3
+httpx>=0.27
+redis[hiredis]>=5.0
+sqlalchemy[asyncio]>=2.0
+asyncpg>=0.29
+numpy>=1.26
+pandas>=2.2
+# FCM HTTP v1 service-account assertions. Imported lazily inside app/push/fcm.py
+# so the test suite runs without it.
+google-auth>=2.30
+
+# ── test-only ──────────────────────────────────────────────────────────────
+pytest>=8.0
+pytest-asyncio>=0.23
+anyio>=4.0

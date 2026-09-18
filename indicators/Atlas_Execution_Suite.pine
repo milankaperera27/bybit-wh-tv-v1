@@ -1,0 +1,470 @@
+//@version=6
+// =============================================================================
+// ATLAS — Atlas_Execution_Suite.pine
+// Unified production indicator: Atlas_SMC_Core + Atlas_Regime_Filter + the
+// standardized webhook dispatcher (spec §3.1 reference listing, superset).
+//
+// The emitted JSON is FROZEN CONTRACT A (IMPLEMENTATION_ARTIFACT.md §3):
+//   {"token","symbol","venue","action","limit_price","stop_loss",
+//    "take_profit_1","take_profit_2","regime","risk_pct"}
+// Key order, quoting and number formatting below are contractual — do not edit.
+//
+// POST target: https://<host>/api/v1/webhooks/tradingview
+// `webhook_token` MUST equal the backend's ATLAS_WEBHOOK_TOKEN.
+// =============================================================================
+indicator("Atlas SMC & Regime Execution Suite [v6]", overlay=true, max_boxes_count=500, max_lines_count=500)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 0. Inputs — the four groups below are frozen by the spec (§3.1). Names,
+//    titles, defaults, bounds and group labels are reproduced verbatim.
+// ─────────────────────────────────────────────────────────────────────────────
+group_gen       = "General Setup"
+target_venue    = input.string("TRADOVATE", "Target Venue", options=["TRADOVATE", "KRAKEN"], group=group_gen)
+risk_pct_input  = input.float(1.0, "Risk Per Trade (%)", minval=0.1, maxval=5.0, step=0.1, group=group_gen)
+webhook_token   = input.string("SECRET_TOKEN", "Webhook Token", group=group_gen)
+
+group_smc       = "Smart Money Concepts"
+show_smc        = input.bool(true, "Enable SMC Engine", group=group_smc)
+pivot_len       = input.int(5, "Swing Pivot Length", minval=2, maxval=20, group=group_smc)
+show_fvg        = input.bool(true, "Show Fair Value Gaps", group=group_smc)
+
+group_regime    = "Market Regime Filter"
+adx_len         = input.int(14, "ADX Length", group=group_regime)
+adx_threshold   = input.int(22, "ADX Trend Threshold", group=group_regime)
+
+// ── extensions (additive only; nothing above is renamed or re-defaulted) ─────
+group_smc_x     = "Smart Money Concepts — Extended"
+fvg_extend      = input.int(8, "FVG Box Extension (bars)", minval=1, maxval=200, group=group_smc_x)
+show_fvg_mid    = input.bool(true, "Show FVG 50% Midline (Consequent Encroachment)", group=group_smc_x)
+max_fvg         = input.int(20, "Max Live FVG Zones", minval=1, maxval=100, group=group_smc_x)
+mit_mode        = input.string("Grey Out", "Mitigated FVG Handling", options=["Grey Out", "Delete"], group=group_smc_x)
+show_ob         = input.bool(true, "Show Order Blocks", group=group_smc_x)
+ob_lookback     = input.int(20, "Displacement Lookback (bars)", minval=1, maxval=100, group=group_smc_x)
+ob_extend       = input.int(20, "Order Block Extension (bars)", minval=1, maxval=200, group=group_smc_x)
+max_ob          = input.int(10, "Max Live Order Blocks", minval=1, maxval=50, group=group_smc_x)
+show_liq        = input.bool(true, "Show Liquidity Sweeps", group=group_smc_x)
+liq_ref         = input.string("Previous Day", "Sweep Reference", options=["Previous Day", "Previous Session"], group=group_smc_x)
+liq_session     = input.session("0930-1600", "Session Window", group=group_smc_x)
+
+group_mtf       = "Multi-Timeframe Radar"
+show_radar      = input.bool(true, "Show Regime Radar Table", group=group_mtf)
+tf_ltf          = input.timeframe("5", "Low Timeframe", group=group_mtf)
+tf_mtf          = input.timeframe("60", "Mid Timeframe", group=group_mtf)
+tf_htf          = input.timeframe("D", "High Timeframe", group=group_mtf)
+
+group_exec      = "Execution & Display"
+enable_alerts   = input.bool(true, "Enable Webhook Dispatch (alert())", group=group_exec)
+show_levels     = input.bool(true, "Draw SL / TP1 / TP2 Levels", group=group_exec)
+level_extend    = input.int(30, "Level Line Length (bars)", minval=1, maxval=300, group=group_exec)
+show_panel      = input.bool(true, "Show Execution Info Panel", group=group_exec)
+
+col_bull        = input.color(#089981, "Bullish", group=group_exec)
+col_bear        = input.color(#f23645, "Bearish", group=group_exec)
+col_mit         = input.color(#787b86, "Mitigated", group=group_exec)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. Regime Detection Engine  (spec §3.1 §1 — verbatim logic and ordering)
+// ─────────────────────────────────────────────────────────────────────────────
+ema_fast = ta.ema(close, 50)
+ema_slow = ta.ema(close, 200)
+[di_p, di_m, adx_val] = ta.dmi(adx_len, adx_len)
+atr_val = ta.atr(14)
+vol_expansion = atr_val > ta.sma(atr_val, 50)
+
+var string market_regime = "NEUTRAL"
+if adx_val > adx_threshold and close > ema_slow and ema_fast > ema_slow
+    market_regime := "BULL_TREND_EXPANSION"
+else if adx_val > adx_threshold and close < ema_slow and ema_fast < ema_slow
+    market_regime := "BEAR_TREND_EXPANSION"
+else if adx_val <= adx_threshold and not vol_expansion
+    market_regime := "RANGE_COMPRESSION"
+else
+    market_regime := "VOLATILITY_CHOP"
+
+// numeric mirror of the regime, plus the ATR-percentile gauge
+int regime_code = market_regime == "BULL_TREND_EXPANSION" ? 1 : market_regime == "BEAR_TREND_EXPANSION" ? 2 : market_regime == "RANGE_COMPRESSION" ? 3 : 4
+float atr_pctl = ta.percentrank(atr_val, 100)
+
+f_regime_name(int code) =>
+    string out = code == 1 ? "BULL_TREND_EXPANSION" : code == 2 ? "BEAR_TREND_EXPANSION" : code == 3 ? "RANGE_COMPRESSION" : code == 4 ? "VOLATILITY_CHOP" : "NEUTRAL"
+    out
+
+f_regime_color(int code) =>
+    color out = code == 1 ? #089981 : code == 2 ? #f23645 : code == 3 ? #2962ff : code == 4 ? #ff9800 : #787b86
+    out
+
+// Same classifier, packaged for request.security(). `carried` returns the
+// previous *closed* bar's code, which together with lookahead_off gives the
+// standard non-repainting [1] behaviour on every higher timeframe.
+f_regime_code() =>
+    float ef = ta.ema(close, 50)
+    float es = ta.ema(close, 200)
+    [rdp, rdm, rax] = ta.dmi(adx_len, adx_len)
+    float av = ta.atr(14)
+    bool vx = av > ta.sma(av, 50)
+    int c = 0
+    if rax > adx_threshold and close > es and ef > es
+        c := 1
+    else if rax > adx_threshold and close < es and ef < es
+        c := 2
+    else if rax <= adx_threshold and not vx
+        c := 3
+    else
+        c := 4
+    var int carried = 0
+    int confirmed = carried
+    carried := c
+    confirmed
+
+int ltf_code = nz(request.security(syminfo.tickerid, tf_ltf, f_regime_code(), lookahead=barmerge.lookahead_off), 0)
+int mtf_code = nz(request.security(syminfo.tickerid, tf_mtf, f_regime_code(), lookahead=barmerge.lookahead_off), 0)
+int htf_code = nz(request.security(syminfo.tickerid, tf_htf, f_regime_code(), lookahead=barmerge.lookahead_off), 0)
+
+f_align(int code) =>
+    int out = code == 1 ? 1 : code == 2 ? -1 : 0
+    out
+
+int mtf_alignment = f_align(ltf_code) + f_align(mtf_code) + f_align(htf_code)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2. SMC Structure & FVG Logic  (spec §3.1 §2, extended with BOS/MSS split,
+//    FVG mitigation, order blocks and liquidity sweeps)
+// ─────────────────────────────────────────────────────────────────────────────
+ph = ta.pivothigh(high, pivot_len, pivot_len)
+pl = ta.pivotlow(low, pivot_len, pivot_len)
+
+var float last_sh = na
+var float last_sl = na
+
+if not na(ph)
+    last_sh := high[pivot_len]
+if not na(pl)
+    last_sl := low[pivot_len]
+
+// A break of the last swing high while the tracked leg is already bullish is a
+// BOS (continuation); the same break against a bearish/undefined leg is an MSS.
+// ta.crossover/ta.crossunder are hoisted out of the `and` chain so they are
+// evaluated on every bar (Pine's logical operators are lazy).
+bool cross_up = ta.crossover(close, last_sh)
+bool cross_dn = ta.crossunder(close, last_sl)
+bool bull_break = not na(last_sh) and cross_up
+bool bear_break = not na(last_sl) and cross_dn
+
+var int trend_dir = 0
+bool bull_bos = false
+bool bear_bos = false
+bool bull_mss = false
+bool bear_mss = false
+
+if bull_break
+    if trend_dir == 1
+        bull_bos := true
+    else
+        bull_mss := true
+    trend_dir := 1
+
+if bear_break
+    if trend_dir == -1
+        bear_bos := true
+    else
+        bear_mss := true
+    trend_dir := -1
+
+bool bull_fvg = show_fvg and (low > high[2])
+bool bear_fvg = show_fvg and (high < low[2])
+
+var array<box>   fvg_boxes = array.new<box>()
+var array<line>  fvg_mids  = array.new<line>()
+var array<float> fvg_ce    = array.new<float>()
+var array<int>   fvg_dir   = array.new<int>()
+var array<bool>  fvg_mit   = array.new<bool>()
+
+f_drop_fvg(int i) =>
+    box.delete(array.get(fvg_boxes, i))
+    line.delete(array.get(fvg_mids, i))
+    array.remove(fvg_boxes, i)
+    array.remove(fvg_mids, i)
+    array.remove(fvg_ce, i)
+    array.remove(fvg_dir, i)
+    array.remove(fvg_mit, i)
+    i
+
+if show_smc and bull_fvg
+    float gap_top = low
+    float gap_bot = high[2]
+    float ce = (gap_top + gap_bot) / 2.0
+    box b = box.new(bar_index - 2, gap_top, bar_index + fvg_extend, gap_bot, bgcolor=color.new(col_bull, 85), border_color=color.new(col_bull, 40))
+    line m = line.new(bar_index - 2, ce, bar_index + fvg_extend, ce, color=color.new(col_bull, show_fvg_mid ? 25 : 100), style=line.style_dotted, width=1)
+    array.push(fvg_boxes, b)
+    array.push(fvg_mids, m)
+    array.push(fvg_ce, ce)
+    array.push(fvg_dir, 1)
+    array.push(fvg_mit, false)
+
+if show_smc and bear_fvg
+    float sgap_top = low[2]
+    float sgap_bot = high
+    float sce = (sgap_top + sgap_bot) / 2.0
+    box sb = box.new(bar_index - 2, sgap_top, bar_index + fvg_extend, sgap_bot, bgcolor=color.new(col_bear, 85), border_color=color.new(col_bear, 40))
+    line sm = line.new(bar_index - 2, sce, bar_index + fvg_extend, sce, color=color.new(col_bear, show_fvg_mid ? 25 : 100), style=line.style_dotted, width=1)
+    array.push(fvg_boxes, sb)
+    array.push(fvg_mids, sm)
+    array.push(fvg_ce, sce)
+    array.push(fvg_dir, -1)
+    array.push(fvg_mit, false)
+
+while array.size(fvg_boxes) > max_fvg
+    f_drop_fvg(0)
+
+bool fvg_mitigated = false
+if array.size(fvg_boxes) > 0
+    for i = array.size(fvg_boxes) - 1 to 0
+        bool already = array.get(fvg_mit, i)
+        int zdir = array.get(fvg_dir, i)
+        float ce_lvl = array.get(fvg_ce, i)
+        if not already
+            bool hit = zdir == 1 ? (low <= ce_lvl) : (high >= ce_lvl)
+            if hit
+                fvg_mitigated := true
+                if mit_mode == "Delete"
+                    f_drop_fvg(i)
+                else
+                    array.set(fvg_mit, i, true)
+                    box.set_bgcolor(array.get(fvg_boxes, i), color.new(col_mit, 90))
+                    box.set_border_color(array.get(fvg_boxes, i), color.new(col_mit, 60))
+                    line.set_color(array.get(fvg_mids, i), color.new(col_mit, show_fvg_mid ? 60 : 100))
+            else
+                box.set_right(array.get(fvg_boxes, i), bar_index + fvg_extend)
+                line.set_x2(array.get(fvg_mids, i), bar_index + fvg_extend)
+
+// ── Order Blocks: last opposing candle before the displacement leg ───────────
+var array<box> ob_boxes = array.new<box>()
+bool bull_ob = false
+bool bear_ob = false
+
+if show_smc and show_ob and (bull_mss or bull_bos)
+    int idx = -1
+    int lim = math.min(ob_lookback, bar_index)
+    if lim >= 1
+        for i = 1 to lim
+            if close[i] < open[i]
+                idx := i
+                break
+    if idx >= 0
+        box ob = box.new(bar_index - idx, high[idx], bar_index + ob_extend, low[idx], bgcolor=color.new(col_bull, 80), border_color=color.new(col_bull, 20), text="OB", text_color=color.new(col_bull, 0), text_size=size.tiny)
+        array.push(ob_boxes, ob)
+        bull_ob := true
+
+if show_smc and show_ob and (bear_mss or bear_bos)
+    int sidx = -1
+    int slim = math.min(ob_lookback, bar_index)
+    if slim >= 1
+        for i = 1 to slim
+            if close[i] > open[i]
+                sidx := i
+                break
+    if sidx >= 0
+        box sob = box.new(bar_index - sidx, high[sidx], bar_index + ob_extend, low[sidx], bgcolor=color.new(col_bear, 80), border_color=color.new(col_bear, 20), text="OB", text_color=color.new(col_bear, 0), text_size=size.tiny)
+        array.push(ob_boxes, sob)
+        bear_ob := true
+
+while array.size(ob_boxes) > max_ob
+    box.delete(array.get(ob_boxes, 0))
+    array.remove(ob_boxes, 0)
+
+// ── Liquidity: previous day / previous session high & low, taken + reclaimed ─
+float pdh = request.security(syminfo.tickerid, "D", high[1], lookahead=barmerge.lookahead_off)
+float pdl = request.security(syminfo.tickerid, "D", low[1], lookahead=barmerge.lookahead_off)
+
+bool in_sess = not na(time(timeframe.period, liq_session))
+bool sess_open = in_sess and not in_sess[1]
+bool sess_close = not in_sess and in_sess[1]
+
+var float cur_sess_h = na
+var float cur_sess_l = na
+var float prev_sess_h = na
+var float prev_sess_l = na
+
+if sess_open
+    cur_sess_h := high
+    cur_sess_l := low
+else if in_sess
+    cur_sess_h := math.max(nz(cur_sess_h, high), high)
+    cur_sess_l := math.min(nz(cur_sess_l, low), low)
+
+if sess_close
+    prev_sess_h := cur_sess_h
+    prev_sess_l := cur_sess_l
+
+float liq_high = liq_ref == "Previous Day" ? pdh : prev_sess_h
+float liq_low = liq_ref == "Previous Day" ? pdl : prev_sess_l
+
+bool sweep_high = show_smc and show_liq and not na(liq_high) and high > liq_high and close < liq_high
+bool sweep_low = show_smc and show_liq and not na(liq_low) and low < liq_low and close > liq_low
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. Signal Generation  (spec §3.1 §3 — verbatim)
+// ─────────────────────────────────────────────────────────────────────────────
+bool signal_buy  = (market_regime == "BULL_TREND_EXPANSION" or market_regime == "RANGE_COMPRESSION") and bull_fvg and close > ema_fast
+bool signal_sell = (market_regime == "BEAR_TREND_EXPANSION" or market_regime == "RANGE_COMPRESSION") and bear_fvg and close < ema_fast
+
+float sl = signal_buy ? (low[1] - atr_val * 0.5) : (signal_sell ? (high[1] + atr_val * 0.5) : na)
+float risk_dist = math.abs(close - sl)
+float tp1 = signal_buy ? (close + risk_dist * 1.5) : (signal_sell ? (close - risk_dist * 1.5) : na)
+float tp2 = signal_buy ? (close + risk_dist * 3.0) : (signal_sell ? (close - risk_dist * 3.0) : na)
+
+plotshape(signal_buy, "Buy Signal", shape.triangleup, location.belowbar, color.green, size=size.small)
+plotshape(signal_sell, "Sell Signal", shape.triangledown, location.abovebar, color.red, size=size.small)
+
+// only dispatch when every contract field is a real number
+bool valid_levels = not na(sl) and not na(tp1) and not na(tp2) and risk_dist > 0
+bool fire_buy  = signal_buy and valid_levels
+bool fire_sell = signal_sell and valid_levels
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. Alert JSON Dispatcher  (spec §3.1 §4 — FROZEN CONTRACT A)
+//    Key order: token, symbol, venue, action, limit_price, stop_loss,
+//               take_profit_1, take_profit_2, regime, risk_pct
+//    Strings quoted, numbers unquoted, no trailing comma.
+// ─────────────────────────────────────────────────────────────────────────────
+payload(string action, float stop, float target1, float target2) =>
+    '{"token":"' + webhook_token + '","symbol":"' + syminfo.ticker + '","venue":"' + target_venue +
+      '","action":"' + action + '","limit_price":' + str.tostring(close, "#.##") +
+      ',"stop_loss":' + str.tostring(stop, "#.##") + ',"take_profit_1":' + str.tostring(target1, "#.##") +
+      ',"take_profit_2":' + str.tostring(target2, "#.##") + ',"regime":"' + market_regime +
+      '","risk_pct":' + str.tostring(risk_pct_input, "#.#") + '}'
+
+if enable_alerts and fire_buy
+    alert(payload("BUY", sl, tp1, tp2), alert.freq_once_per_bar_close)
+if enable_alerts and fire_sell
+    alert(payload("SELL", sl, tp1, tp2), alert.freq_once_per_bar_close)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. SL / TP level lines + last-signal memory
+// ─────────────────────────────────────────────────────────────────────────────
+var float last_sl_lvl = na
+var float last_tp1_lvl = na
+var float last_tp2_lvl = na
+var float last_entry = na
+var string last_action = "—"
+
+var line ln_sl = na
+var line ln_tp1 = na
+var line ln_tp2 = na
+
+if fire_buy or fire_sell
+    last_sl_lvl := sl
+    last_tp1_lvl := tp1
+    last_tp2_lvl := tp2
+    last_entry := close
+    last_action := fire_buy ? "BUY" : "SELL"
+    if show_levels
+        if not na(ln_sl)
+            line.delete(ln_sl)
+        if not na(ln_tp1)
+            line.delete(ln_tp1)
+        if not na(ln_tp2)
+            line.delete(ln_tp2)
+        ln_sl := line.new(bar_index, sl, bar_index + level_extend, sl, color=color.new(col_bear, 0), style=line.style_dashed, width=1)
+        ln_tp1 := line.new(bar_index, tp1, bar_index + level_extend, tp1, color=color.new(col_bull, 30), style=line.style_dotted, width=1)
+        ln_tp2 := line.new(bar_index, tp2, bar_index + level_extend, tp2, color=color.new(col_bull, 0), style=line.style_dotted, width=1)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. Regime radar + execution info panel
+// ─────────────────────────────────────────────────────────────────────────────
+var table radar = table.new(position.top_right, 2, 5, border_width=1, frame_width=1, frame_color=color.new(#787b86, 40))
+
+if show_radar and barstate.islast
+    table.cell(radar, 0, 0, "ATLAS REGIME RADAR", text_color=color.white, bgcolor=color.new(#2a2e39, 0), text_size=size.small)
+    table.cell(radar, 1, 0, "ADX " + str.tostring(adx_val, "#.#"), text_color=color.white, bgcolor=color.new(#2a2e39, 0), text_size=size.small)
+    table.cell(radar, 0, 1, "CHART " + timeframe.period, text_color=color.white, bgcolor=color.new(#363a45, 0), text_size=size.small)
+    table.cell(radar, 1, 1, market_regime, text_color=color.white, bgcolor=color.new(f_regime_color(regime_code), 25), text_size=size.small)
+    table.cell(radar, 0, 2, "LTF " + tf_ltf, text_color=color.white, bgcolor=color.new(#363a45, 0), text_size=size.small)
+    table.cell(radar, 1, 2, f_regime_name(ltf_code), text_color=color.white, bgcolor=color.new(f_regime_color(ltf_code), 25), text_size=size.small)
+    table.cell(radar, 0, 3, "MTF " + tf_mtf, text_color=color.white, bgcolor=color.new(#363a45, 0), text_size=size.small)
+    table.cell(radar, 1, 3, f_regime_name(mtf_code), text_color=color.white, bgcolor=color.new(f_regime_color(mtf_code), 25), text_size=size.small)
+    table.cell(radar, 0, 4, "HTF " + tf_htf, text_color=color.white, bgcolor=color.new(#363a45, 0), text_size=size.small)
+    table.cell(radar, 1, 4, f_regime_name(htf_code), text_color=color.white, bgcolor=color.new(f_regime_color(htf_code), 25), text_size=size.small)
+
+var table panel = table.new(position.bottom_right, 2, 8, border_width=1, frame_width=1, frame_color=color.new(#787b86, 40))
+
+if show_panel and barstate.islast
+    table.cell(panel, 0, 0, "ATLAS EXECUTION", text_color=color.white, bgcolor=color.new(#2a2e39, 0), text_size=size.small)
+    table.cell(panel, 1, 0, syminfo.ticker, text_color=color.white, bgcolor=color.new(#2a2e39, 0), text_size=size.small)
+    table.cell(panel, 0, 1, "Regime", text_color=color.white, bgcolor=color.new(#363a45, 0), text_size=size.small)
+    table.cell(panel, 1, 1, market_regime, text_color=color.white, bgcolor=color.new(f_regime_color(regime_code), 25), text_size=size.small)
+    table.cell(panel, 0, 2, "Risk / Trade", text_color=color.white, bgcolor=color.new(#363a45, 0), text_size=size.small)
+    table.cell(panel, 1, 2, str.tostring(risk_pct_input, "#.#") + " %", text_color=color.white, bgcolor=color.new(#363a45, 0), text_size=size.small)
+    table.cell(panel, 0, 3, "Target Venue", text_color=color.white, bgcolor=color.new(#363a45, 0), text_size=size.small)
+    table.cell(panel, 1, 3, target_venue, text_color=color.white, bgcolor=color.new(#363a45, 0), text_size=size.small)
+    table.cell(panel, 0, 4, "Last Signal", text_color=color.white, bgcolor=color.new(#363a45, 0), text_size=size.small)
+    table.cell(panel, 1, 4, last_action + (na(last_entry) ? "" : "  @ " + str.tostring(last_entry, "#.##")), text_color=color.white, bgcolor=color.new(last_action == "BUY" ? col_bull : last_action == "SELL" ? col_bear : #363a45, 25), text_size=size.small)
+    table.cell(panel, 0, 5, "Stop Loss", text_color=color.white, bgcolor=color.new(#363a45, 0), text_size=size.small)
+    table.cell(panel, 1, 5, na(last_sl_lvl) ? "—" : str.tostring(last_sl_lvl, "#.##"), text_color=color.white, bgcolor=color.new(col_bear, 55), text_size=size.small)
+    table.cell(panel, 0, 6, "Take Profit 1 (1.5R)", text_color=color.white, bgcolor=color.new(#363a45, 0), text_size=size.small)
+    table.cell(panel, 1, 6, na(last_tp1_lvl) ? "—" : str.tostring(last_tp1_lvl, "#.##"), text_color=color.white, bgcolor=color.new(col_bull, 55), text_size=size.small)
+    table.cell(panel, 0, 7, "Take Profit 2 (3.0R)", text_color=color.white, bgcolor=color.new(#363a45, 0), text_size=size.small)
+    table.cell(panel, 1, 7, na(last_tp2_lvl) ? "—" : str.tostring(last_tp2_lvl, "#.##"), text_color=color.white, bgcolor=color.new(col_bull, 55), text_size=size.small)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7. Chart overlays + STATE EXPORT (Data Window & {{plot("...")}} placeholders)
+// ─────────────────────────────────────────────────────────────────────────────
+plot(ema_fast, "EMA 50", color=color.new(#2962ff, 0), linewidth=1)
+plot(ema_slow, "EMA 200", color=color.new(#ff6d00, 0), linewidth=2)
+plot(show_smc and show_liq ? liq_high : na, "Liquidity High", color=color.new(col_bear, 45), style=plot.style_linebr)
+plot(show_smc and show_liq ? liq_low : na, "Liquidity Low", color=color.new(col_bull, 45), style=plot.style_linebr)
+
+plotshape(sweep_high, "Sweep High", shape.xcross, location.abovebar, col_bear, size=size.tiny)
+plotshape(sweep_low, "Sweep Low", shape.xcross, location.belowbar, col_bull, size=size.tiny)
+plotshape(show_smc and bull_mss, "Bullish MSS", shape.labelup, location.belowbar, col_bull, size=size.tiny, text="MSS", textcolor=color.white)
+plotshape(show_smc and bear_mss, "Bearish MSS", shape.labeldown, location.abovebar, col_bear, size=size.tiny, text="MSS", textcolor=color.white)
+plotshape(show_smc and bull_bos, "Bullish BOS", shape.labelup, location.belowbar, color.new(col_bull, 45), size=size.tiny, text="BOS", textcolor=color.white)
+plotshape(show_smc and bear_bos, "Bearish BOS", shape.labeldown, location.abovebar, color.new(col_bear, 45), size=size.tiny, text="BOS", textcolor=color.white)
+
+// contract mirrors — these titles back the {{plot("...")}} alert placeholders
+plot(close, "limit_price", display=display.data_window)
+plot(sl, "stop_loss", display=display.data_window)
+plot(tp1, "take_profit_1", display=display.data_window)
+plot(tp2, "take_profit_2", display=display.data_window)
+plot(risk_pct_input, "risk_pct", display=display.data_window)
+
+// SMC / regime state exports
+plot(bull_mss ? 1.0 : 0.0, "bull_mss", display=display.data_window)
+plot(bear_mss ? 1.0 : 0.0, "bear_mss", display=display.data_window)
+plot(bull_bos ? 1.0 : 0.0, "bull_bos", display=display.data_window)
+plot(bear_bos ? 1.0 : 0.0, "bear_bos", display=display.data_window)
+plot(bull_fvg ? 1.0 : 0.0, "bull_fvg", display=display.data_window)
+plot(bear_fvg ? 1.0 : 0.0, "bear_fvg", display=display.data_window)
+plot(bull_ob ? 1.0 : 0.0, "bull_ob", display=display.data_window)
+plot(bear_ob ? 1.0 : 0.0, "bear_ob", display=display.data_window)
+plot(sweep_high ? 1.0 : 0.0, "sweep_high", display=display.data_window)
+plot(sweep_low ? 1.0 : 0.0, "sweep_low", display=display.data_window)
+plot(fvg_mitigated ? 1.0 : 0.0, "fvg_mitigated", display=display.data_window)
+plot(signal_buy ? 1.0 : 0.0, "signal_buy", display=display.data_window)
+plot(signal_sell ? 1.0 : 0.0, "signal_sell", display=display.data_window)
+plot(regime_code, "regime_code", display=display.data_window)
+plot(ltf_code, "regime_code_ltf", display=display.data_window)
+plot(mtf_code, "regime_code_mtf", display=display.data_window)
+plot(htf_code, "regime_code_htf", display=display.data_window)
+plot(mtf_alignment, "mtf_alignment", display=display.data_window)
+plot(adx_val, "adx", display=display.data_window)
+plot(di_p, "di_plus", display=display.data_window)
+plot(di_m, "di_minus", display=display.data_window)
+plot(atr_val, "atr", display=display.data_window)
+plot(atr_pctl, "atr_percentile", display=display.data_window)
+plot(vol_expansion ? 1.0 : 0.0, "vol_expansion", display=display.data_window)
+plot(trend_dir, "trend_dir", display=display.data_window)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 8. alertcondition() variants — lets the same contract be wired straight from
+//    the TradingView "Create Alert" dialog instead of through alert().
+//    The regime is baked in per-condition so the JSON stays a const string.
+//    Replace __ATLAS_WEBHOOK_TOKEN__ (and "TRADOVATE" if routing to Kraken)
+//    in the alert's Message box before saving.
+// ─────────────────────────────────────────────────────────────────────────────
+alertcondition(fire_buy and regime_code == 1, "ATLAS — BUY (BULL_TREND_EXPANSION)", '{"token":"__ATLAS_WEBHOOK_TOKEN__","symbol":"{{ticker}}","venue":"TRADOVATE","action":"BUY","limit_price":{{plot("limit_price")}},"stop_loss":{{plot("stop_loss")}},"take_profit_1":{{plot("take_profit_1")}},"take_profit_2":{{plot("take_profit_2")}},"regime":"BULL_TREND_EXPANSION","risk_pct":{{plot("risk_pct")}}}')
+alertcondition(fire_buy and regime_code == 3, "ATLAS — BUY (RANGE_COMPRESSION)", '{"token":"__ATLAS_WEBHOOK_TOKEN__","symbol":"{{ticker}}","venue":"TRADOVATE","action":"BUY","limit_price":{{plot("limit_price")}},"stop_loss":{{plot("stop_loss")}},"take_profit_1":{{plot("take_profit_1")}},"take_profit_2":{{plot("take_profit_2")}},"regime":"RANGE_COMPRESSION","risk_pct":{{plot("risk_pct")}}}')
+alertcondition(fire_sell and regime_code == 2, "ATLAS — SELL (BEAR_TREND_EXPANSION)", '{"token":"__ATLAS_WEBHOOK_TOKEN__","symbol":"{{ticker}}","venue":"TRADOVATE","action":"SELL","limit_price":{{plot("limit_price")}},"stop_loss":{{plot("stop_loss")}},"take_profit_1":{{plot("take_profit_1")}},"take_profit_2":{{plot("take_profit_2")}},"regime":"BEAR_TREND_EXPANSION","risk_pct":{{plot("risk_pct")}}}')
+alertcondition(fire_sell and regime_code == 3, "ATLAS — SELL (RANGE_COMPRESSION)", '{"token":"__ATLAS_WEBHOOK_TOKEN__","symbol":"{{ticker}}","venue":"TRADOVATE","action":"SELL","limit_price":{{plot("limit_price")}},"stop_loss":{{plot("stop_loss")}},"take_profit_1":{{plot("take_profit_1")}},"take_profit_2":{{plot("take_profit_2")}},"regime":"RANGE_COMPRESSION","risk_pct":{{plot("risk_pct")}}}')
+alertcondition(fire_buy, "ATLAS — Any BUY Signal", "ATLAS BUY signal on {{ticker}} {{interval}}")
+alertcondition(fire_sell, "ATLAS — Any SELL Signal", "ATLAS SELL signal on {{ticker}} {{interval}}")

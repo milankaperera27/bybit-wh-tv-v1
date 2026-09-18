@@ -1,0 +1,38 @@
+{
+  "name": "atlas-mobile-dashboard",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "ATLAS HITL 1-tap confirmation dashboard — installable Android PWA (Capacitor 6 + React 18 + Vite).",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run typecheck && vite build",
+    "preview": "vite preview --host --port 4173",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
+    "cap:sync": "npm run build && cap sync android",
+    "cap:android": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/haptics": "^6.0.2",
+    "@capacitor/preferences": "^6.0.3",
+    "@capacitor/push-notifications": "^6.0.4",
+    "firebase": "^11.0.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0",
+    "@types/node": "^22.10.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vite-plugin-pwa": "^0.21.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
