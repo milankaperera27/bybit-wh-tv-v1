@@ -75,21 +75,51 @@ class DashboardHub:
         """Current regime + live pending setups + kill-switch flag."""
         pending: List[Dict[str, Any]] = []
         regime = None
-        kill = False
+        kill: Dict[str, Any] = {"engaged": False}
         try:
             pending = await redis_client.list_pending_setups()
             regime_doc = await redis_client.get_current_regime()
             regime = (regime_doc or {}).get("regime")
-            kill = await redis_client.is_kill_switch_engaged()
+            kill = kill_switch_frame(await redis_client.kill_switch_state())
         except Exception:
             logger.debug("dashboard snapshot degraded", exc_info=True)
         return {
             "type": "snapshot",
             "regime": regime,
+            # `setups` is the key the PWA parses (see mobile-dashboard/src/api/socket.ts).
+            # `pending` is kept as a deprecated alias for any older client.
+            "setups": pending,
             "pending": pending,
             "kill_switch": kill,
             "emitted_at": datetime.now(timezone.utc).isoformat(),
         }
+
+
+def kill_switch_frame(state: Dict[str, Any]) -> Dict[str, Any]:
+    """Shape a kill-switch state dict the way the PWA's parser expects.
+
+    The client requires a *nested object* whose `engaged` is a boolean, and
+    reads `lockout` / `daily_drawdown_limit_pct`; the REST payload spells the
+    first of those `drawdown_lockout`.  Both spellings are emitted so the
+    dashboard banner and the REST schema stay in agreement.
+    """
+    state = dict(state or {})
+    engaged = bool(state.get("engaged", False))
+    lockout = bool(state.get("lockout", state.get("drawdown_lockout", False)))
+    frame: Dict[str, Any] = {
+        "engaged": engaged,
+        "engaged_at": state.get("engaged_at"),
+        "reason": state.get("reason"),
+        "daily_drawdown_pct": float(state.get("daily_drawdown_pct") or 0.0),
+        "lockout": lockout,
+        "drawdown_lockout": lockout,
+        "open_positions": state.get("open_positions"),
+    }
+    limit = state.get("daily_drawdown_limit_pct")
+    if limit is None:
+        limit = get_settings().max_daily_drawdown_pct
+    frame["daily_drawdown_limit_pct"] = float(limit)
+    return frame
 
 
 #: Module-level singleton so routers can `from app.main import dashboard_hub`.

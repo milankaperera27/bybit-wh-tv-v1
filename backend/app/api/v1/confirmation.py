@@ -205,7 +205,7 @@ async def confirm_setup(
 
     # 7. release the Redis hold — the setup is no longer pending.
     await redis_client_delete(signal_id)
-    await _broadcast({"type": "routed", "signal_id": signal_id, "venue": venue.value})
+    await _broadcast({"type": "setup_resolved", "signal_id": signal_id, "status": SignalStatus.ROUTED.value, "venue": venue.value})
 
     return OrderResult(
         signal_id=signal_id,
@@ -252,7 +252,7 @@ async def reject_setup(
     )
     await ledger.update_signal_status(signal_id, result.current.value, body.reason)
     await redis_client_delete(signal_id)
-    await _broadcast({"type": "rejected", "signal_id": signal_id})
+    await _broadcast({"type": "setup_resolved", "signal_id": signal_id, "status": SignalStatus.REJECTED.value})
     return {"signal_id": signal_id, "status": result.current.value, "reason": body.reason}
 
 

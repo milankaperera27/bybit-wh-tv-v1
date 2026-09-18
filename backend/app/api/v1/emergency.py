@@ -30,7 +30,7 @@ async def engage_kill(
     except Exception:
         logger.error("could not persist kill switch", exc_info=True)
         state = {"engaged": True, "reason": reason, "actor": actor, "degraded": True}
-    await _broadcast({"type": "kill_switch", "engaged": True, "reason": reason})
+    await _broadcast({"type": "kill_switch", "kill_switch": _kill_frame(state)})
     return await _status(state)
 
 
@@ -42,7 +42,7 @@ async def release_kill(actor: str = Body(default="operator", embed=True)) -> Kil
     except Exception:
         logger.error("could not persist kill switch release", exc_info=True)
         state = {"engaged": False, "actor": actor, "degraded": True}
-    await _broadcast({"type": "kill_switch", "engaged": False})
+    await _broadcast({"type": "kill_switch", "kill_switch": _kill_frame(state)})
     return await _status(state)
 
 
@@ -144,6 +144,14 @@ async def _status(state: Optional[Dict[str, Any]] = None) -> KillSwitchStatus:
         pending_setups=pending,
         degraded=degraded,
     )
+
+
+def _kill_frame(state: Dict[str, Any]) -> Dict[str, Any]:
+    """Kill-switch frame shaped for the PWA parser (imported lazily: app.main
+    imports this router, so a module-level import would be circular)."""
+    from app.main import kill_switch_frame
+
+    return kill_switch_frame(state)
 
 
 async def _broadcast(frame: Dict[str, Any]) -> None:

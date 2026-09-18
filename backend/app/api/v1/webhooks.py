@@ -215,6 +215,6 @@ async def _broadcast_pending(setup_json: Dict[str, Any]) -> None:
     try:
         from app.main import dashboard_hub
 
-        await dashboard_hub.broadcast({"type": "pending_setup", "setup": setup_json})
+        await dashboard_hub.broadcast({"type": "setup_pending", "setup": setup_json})
     except Exception:  # pragma: no cover - hub is optional
         logger.debug("dashboard broadcast skipped", exc_info=True)
