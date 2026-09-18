@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Body, Path, status
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 
 from app.brokers import get_broker
 from app.brokers.base import BrokerError
@@ -42,13 +43,31 @@ _GONE_DETAIL = (
 # ── reads ──────────────────────────────────────────────────────────────────
 @router.get("/pending", response_model=List[PendingSetup])
 async def list_pending() -> Any:
-    """Every live (unexpired) setup held in Redis."""
+    """Every live (unexpired) setup held in Redis.
+
+    A record that no longer matches the schema — left over from an older build,
+    or hand-written into Redis — is skipped rather than raised.  Validating the
+    whole list eagerly meant one stale key returned HTTP 500 and blanked the
+    dashboard, hiding every *healthy* setup alongside the bad one.
+    """
     try:
         raw = await redis_client.list_pending_setups()
     except Exception:
         logger.warning("pending list unavailable", exc_info=True)
         return []
-    return [PendingSetup.model_validate(item) for item in raw]
+
+    setups: List[PendingSetup] = []
+    for item in raw:
+        try:
+            setups.append(PendingSetup.model_validate(item))
+        except ValidationError:
+            signal_id = item.get("signal_id") if isinstance(item, dict) else None
+            logger.error(
+                "dropping unparseable pending setup %s; delete its Redis key to silence this",
+                signal_id or "<unknown>",
+                exc_info=True,
+            )
+    return setups
 
 
 @router.get(
@@ -60,7 +79,14 @@ async def get_setup(signal_id: str = Path(..., min_length=1)) -> Any:
     setup = await _load(signal_id)
     if setup is None:
         return JSONResponse(status_code=status.HTTP_410_GONE, content={"detail": _GONE_DETAIL})
-    return PendingSetup.model_validate(setup)
+    try:
+        return PendingSetup.model_validate(setup)
+    except ValidationError:
+        logger.error("pending setup %s is unparseable; treating as gone", signal_id, exc_info=True)
+        return JSONResponse(
+            status_code=status.HTTP_410_GONE,
+            content={"detail": "setup record is unreadable and cannot be acted on"},
+        )
 
 
 # ── the tap ────────────────────────────────────────────────────────────────
