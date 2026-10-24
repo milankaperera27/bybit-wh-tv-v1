@@ -1,0 +1,84 @@
+//@version=6
+// Implied Liquidity Zones
+// Projects the liquidation prices of leveraged positions opened at swing
+// highs (shorts) and swing lows (longs). Zones stay live until price sweeps them.
+indicator("Implied Liquidity Zones", "ILZ", overlay = true, max_boxes_count = 500)
+
+// ── Inputs ──────────────────────────────────────────────────────────────
+pivLen   = input.int(10, "Pivot length", minval = 2, group = "Detection")
+mmr      = input.float(0.5, "Maintenance margin %", minval = 0, step = 0.1, group = "Detection") / 100
+
+lev25    = input.bool(true, "25x",  inline = "lev", group = "Leverage")
+lev50    = input.bool(true, "50x",  inline = "lev", group = "Leverage")
+lev100   = input.bool(true, "100x", inline = "lev", group = "Leverage")
+
+widthAtr = input.float(0.25, "Zone width (ATR)", minval = 0.05, step = 0.05, group = "Style")
+maxZones = input.int(60, "Max live zones", minval = 1, maxval = 450, group = "Style")
+showTxt  = input.bool(true, "Show leverage labels", group = "Style")
+keepHit  = input.bool(false, "Keep swept zones", group = "Style")
+upCol    = input.color(#f23645, "Short liquidations (above)", group = "Style")
+dnCol    = input.color(#089981, "Long liquidations (below)", group = "Style")
+
+// ── State ───────────────────────────────────────────────────────────────
+var array<box>   zones = array.new<box>()
+var array<float> lvls  = array.new<float>()
+var array<int>   sides = array.new<int>()   // 1 = above price, -1 = below
+
+atr = ta.atr(14)
+ph  = ta.pivothigh(high, pivLen, pivLen)
+pl  = ta.pivotlow(low, pivLen, pivLen)
+
+addZone(float lvl, int side, float lev, int transp) =>
+    half = atr * widthAtr * 0.5
+    col  = side == 1 ? upCol : dnCol
+    b = box.new(bar_index - pivLen, lvl + half, bar_index, lvl - half,
+         border_color = color.new(col, 100), bgcolor = color.new(col, transp),
+         extend = extend.right, text = showTxt ? str.tostring(lev, "#") + "x" : "",
+         text_size = size.tiny, text_color = color.new(col, 30), text_halign = text.align_left)
+    zones.push(b)
+    lvls.push(lvl)
+    sides.push(side)
+    if zones.size() > maxZones
+        zones.shift().delete()
+        lvls.shift()
+        sides.shift()
+
+// ── Sweep detection ─────────────────────────────────────────────────────
+sweptUp = false
+sweptDn = false
+if zones.size() > 0
+    for i = zones.size() - 1 to 0
+        side = sides.get(i)
+        hit  = side == 1 ? high >= lvls.get(i) : low <= lvls.get(i)
+        if hit
+            b = zones.get(i)
+            if keepHit
+                b.set_extend(extend.none)
+                b.set_right(bar_index)
+                b.set_bgcolor(color.new(color.gray, 85))
+                b.set_text_color(color.new(color.gray, 60))
+            else
+                b.delete()
+            zones.remove(i)
+            lvls.remove(i)
+            sides.remove(i)
+            sweptUp := sweptUp or side == 1
+            sweptDn := sweptDn or side == -1
+
+// ── New zones ───────────────────────────────────────────────────────────
+// Higher leverage sits closer to entry and is drawn more opaque.
+levs  = array.from(25.0, 50.0, 100.0)
+uses  = array.from(lev25, lev50, lev100)
+fades = array.from(82, 72, 62)
+
+for j = 0 to 2
+    if uses.get(j)
+        lev = levs.get(j)
+        if not na(ph)
+            addZone(ph * (1 + 1 / lev - mmr), 1, lev, fades.get(j))
+        if not na(pl)
+            addZone(pl * (1 - 1 / lev + mmr), -1, lev, fades.get(j))
+
+// ── Alerts ──────────────────────────────────────────────────────────────
+alertcondition(sweptUp, "Short liquidity swept", "ILZ: price swept a short-liquidation zone")
+alertcondition(sweptDn, "Long liquidity swept",  "ILZ: price swept a long-liquidation zone")
