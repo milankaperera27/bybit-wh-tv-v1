@@ -1,0 +1,972 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Svādhyāya</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="A pocket study companion for the Vedas, Upaniṣads, Gītā and Vedānta, read alongside Itzhak Bentov.">
+<meta name="theme-color" content="#F4F3F8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121022" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Gentium+Book+Plus:ital,wght@0,400;0,700;1,400&family=Tiro+Devanagari+Sanskrit:ital@0;1&display=swap">
+<style>
+/* Layout: a single reading column (max 40rem) with a sticky header and a thumb-reach tab bar.
+   Saffron marks the Vedic side; teal marks Bentov's side. Bridges show both. */
+:root{
+  --bg:#F4F3F8; --surface:#FFFFFF; --sunk:#ECEAF3; --ink:#1D1A33; --muted:#5E5A78; --line:#DCD9E8;
+  --saffron:#B87700; --saffron-ink:#7E5200; --saffron-wash:#FBF1DC;
+  --teal:#22706B; --teal-ink:#1A5A56; --teal-wash:#E0F1EF;
+  --focus:#4A55C9;
+  --f-display:"Tiro Devanagari Sanskrit", "Noto Serif Devanagari", Georgia, serif;
+  --f-body:"Gentium Book Plus", "Noto Serif", Georgia, serif;
+  --f-ui:"Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --s-xs:.8125rem; --s-sm:.9375rem; --s-md:1.0625rem; --s-lg:1.3125rem; --s-xl:1.75rem; --s-2xl:2.25rem;
+  --r:12px; --tab-h:64px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121022; --surface:#1B1930; --sunk:#16142A; --ink:#ECEAF6; --muted:#A6A2C0; --line:#2E2B48;
+    --saffron:#E9B04A; --saffron-ink:#F0C06A; --saffron-wash:#2A2213;
+    --teal:#5EC4BC; --teal-ink:#7AD3CC; --teal-wash:#14292B; --focus:#9AA3FF;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121022; --surface:#1B1930; --sunk:#16142A; --ink:#ECEAF6; --muted:#A6A2C0; --line:#2E2B48;
+  --saffron:#E9B04A; --saffron-ink:#F0C06A; --saffron-wash:#2A2213;
+  --teal:#5EC4BC; --teal-ink:#7AD3CC; --teal-wash:#14292B; --focus:#9AA3FF;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:var(--s-md);line-height:1.6;-webkit-text-size-adjust:100%}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--bg)}
+[hidden]{display:none!important}
+a{color:inherit}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:6px}
+h1,h2,h3{font-family:var(--f-display);font-weight:400;line-height:1.2;text-wrap:balance;margin:0}
+.wrap{max-width:40rem;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:12px;padding-block:10px}
+.brand{display:flex;align-items:baseline;gap:8px;text-decoration:none;flex:1;min-width:0}
+.brand b{font-family:var(--f-display);font-weight:400;font-size:var(--s-lg)}
+.brand span{font-family:var(--f-display);color:var(--saffron-ink);font-size:var(--s-sm)}
+.iconbtn{display:inline-grid;place-items:center;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--surface);cursor:pointer;text-decoration:none}
+.iconbtn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+main{padding-block:20px calc(var(--tab-h) + 32px + env(safe-area-inset-bottom,0px))}
+.stack{display:flex;flex-direction:column;gap:20px}
+
+/* tab bar */
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+.tabs nav{max-width:40rem;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr);height:var(--tab-h)}
+.tabs a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-decoration:none;font-family:var(--f-ui);font-size:.72rem;color:var(--muted);letter-spacing:.02em}
+.tabs a .g{font-family:var(--f-display);font-size:1.25rem;line-height:1}
+.tabs a[aria-current="page"]{color:var(--ink)}
+.tabs a[aria-current="page"] .g{color:var(--saffron)}
+.tabs a.b[aria-current="page"] .g{color:var(--teal)}
+
+/* type helpers */
+.eyebrow{font-family:var(--f-ui);font-size:var(--s-xs);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0}
+.lede{color:var(--muted);margin:0}
+.muted{color:var(--muted)}
+p{margin:0}
+.prose{display:flex;flex-direction:column;gap:12px}
+.dev{font-family:var(--f-display);font-size:var(--s-lg);line-height:1.75;color:var(--ink)}
+.iast{font-family:var(--f-body);font-style:italic;color:var(--saffron-ink)}
+.tr{font-size:var(--s-md)}
+
+/* hero */
+.hero{display:grid;gap:14px}
+.hero canvas{width:100%;height:220px;display:block;border-radius:var(--r);background:var(--sunk)}
+.hero .q{display:grid;gap:6px}
+.hero .q .dev{font-size:var(--s-xl);line-height:1.4}
+.phase{font-family:var(--f-ui);font-size:var(--s-xs);color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+.phase i{font-style:normal;display:inline-flex;align-items:center;gap:6px}
+.phase i::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--c)}
+
+/* cards & lists */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.list{display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.item{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding-block:14px;border-bottom:1px solid var(--line);text-decoration:none;align-items:center}
+.item > div{min-width:0}
+.item h3{font-size:var(--s-lg)}
+.item .sub{font-family:var(--f-ui);font-size:var(--s-xs);color:var(--muted)}
+.item .snip{color:var(--muted);font-size:var(--s-sm);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.chev{color:var(--muted);font-family:var(--f-ui)}
+.group-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:8px}
+.group-h h2{font-size:var(--s-xl)}
+
+.meter{height:6px;border-radius:3px;background:var(--sunk);overflow:hidden}
+.meter > i{display:block;height:100%;background:var(--saffron);border-radius:3px}
+.count{font-family:var(--f-ui);font-size:var(--s-xs);color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-ui);font-size:var(--s-xs);padding:3px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.pill.done{border-color:transparent;background:var(--saffron-wash);color:var(--saffron-ink)}
+.pill.b{border-color:transparent;background:var(--teal-wash);color:var(--teal-ink)}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-family:var(--f-ui);font-size:var(--s-sm);cursor:pointer;text-decoration:none}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn.on{background:var(--saffron-wash);color:var(--saffron-ink);border-color:var(--saffron)}
+.btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.btn.on svg.fillable{fill:currentColor}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--sunk);border-radius:999px;padding:4px;gap:4px}
+.seg button{border:0;background:transparent;border-radius:999px;min-height:38px;font-family:var(--f-ui);font-size:var(--s-sm);cursor:pointer;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgb(0 0 0 / .08)}
+
+/* verse view */
+.verse{display:flex;flex-direction:column;gap:16px}
+.verse .ref{font-family:var(--f-ui);font-size:var(--s-sm);color:var(--muted)}
+.verse .dev{font-size:var(--s-xl);line-height:1.6}
+.verse .tr{font-size:var(--s-lg);line-height:1.5}
+.lens{border-left:3px solid var(--teal);padding:4px 0 4px 14px;display:flex;flex-direction:column;gap:6px}
+.lens .eyebrow{color:var(--teal-ink)}
+.vnote{border-left:3px solid var(--saffron);padding:4px 0 4px 14px;display:flex;flex-direction:column;gap:6px}
+.vnote .eyebrow{color:var(--saffron-ink)}
+textarea,input[type="search"]{width:100%;font:inherit;font-family:var(--f-body);background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+textarea{min-height:110px;resize:vertical}
+.pager{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pager .btn{justify-content:flex-start;border-radius:var(--r);min-height:56px;padding:8px 14px;flex-direction:column;align-items:flex-start;gap:0}
+.pager .btn.next{align-items:flex-end;text-align:right}
+.pager .btn small{font-size:var(--s-xs);color:var(--muted)}
+.pager .btn span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crumb{font-family:var(--f-ui);font-size:var(--s-sm);color:var(--muted);text-decoration:none}
+
+/* bridges */
+.bridge{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.bridge summary{list-style:none;cursor:pointer;padding:16px;display:grid;gap:10px}
+.bridge summary::-webkit-details-marker{display:none}
+.pair{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center}
+.pair > div{min-width:0}
+.pair .v{color:var(--saffron-ink)}
+.pair .bt{color:var(--teal-ink);text-align:right}
+.pair .side{font-family:var(--f-ui);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block}
+.pair b{font-family:var(--f-display);font-weight:400;font-size:var(--s-lg);line-height:1.25;display:block}
+.knot{width:28px;height:28px;display:block}
+.bridge .body{padding:0 16px 16px;display:flex;flex-direction:column;gap:14px;border-top:1px solid var(--line);padding-top:14px}
+.split{display:grid;gap:12px}
+.split .v{border-left:3px solid var(--saffron);padding-left:12px}
+.split .bt{border-left:3px solid var(--teal);padding-left:12px}
+.diff{background:var(--sunk);border-radius:10px;padding:12px 14px}
+.links{display:flex;flex-wrap:wrap;gap:8px}
+.links a{font-family:var(--f-ui);font-size:var(--s-xs);text-decoration:none;padding:6px 12px;border-radius:999px;background:var(--saffron-wash);color:var(--saffron-ink)}
+
+/* glossary */
+.gl{display:grid;grid-template-columns:5.5rem 1fr;gap:4px 14px;padding-block:14px;border-bottom:1px solid var(--line)}
+.gl .gd{font-family:var(--f-display);font-size:var(--s-xl);line-height:1.1;color:var(--saffron-ink);overflow-wrap:anywhere}
+.gl > div{min-width:0}
+.gl b{font-family:var(--f-body);font-style:italic}
+
+/* flashcards */
+.flash{perspective:1200px}
+.flash button.face{width:100%;min-height:260px;border-radius:18px;border:1px solid var(--line);background:var(--surface);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px;text-align:center}
+.flash .big{font-family:var(--f-display);font-size:3rem;line-height:1.2;color:var(--saffron-ink)}
+.flash .hint{font-family:var(--f-ui);font-size:var(--s-xs);color:var(--muted)}
+.boxes{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.boxes div{background:var(--sunk);border-radius:8px;padding:8px 4px;text-align:center;font-family:var(--f-ui);font-size:var(--s-xs);color:var(--muted)}
+.boxes b{display:block;font-size:var(--s-lg);color:var(--ink);font-variant-numeric:tabular-nums}
+
+.stat{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center}
+.ring{width:72px;height:72px}
+.empty{padding:28px 16px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:var(--r)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--tab-h) + 16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);font-family:var(--f-ui);font-size:var(--s-sm);padding:10px 16px;border-radius:999px;z-index:40;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+
+.idea{display:flex;flex-direction:column;gap:8px;padding-block:16px;border-bottom:1px solid var(--line)}
+.idea h3{font-size:var(--s-lg)}
+.book{display:grid;gap:4px}
+.book h3{font-size:var(--s-lg)}
+.note-small{font-family:var(--f-ui);font-size:var(--s-xs);color:var(--muted);line-height:1.5}
+
+@media (min-width:640px){
+  .split{grid-template-columns:1fr 1fr}
+  .hero canvas{height:260px}
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none!important;animation:none!important} }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#home" aria-label="Svādhyāya home"><b>Svādhyāya</b><span>स्वाध्याय</span></a>
+    <a class="iconbtn" href="#find" aria-label="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></a>
+    <button class="iconbtn" id="themeBtn" type="button" aria-label="Switch light or dark theme"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+  </div>
+</header>
+
+<main class="wrap" id="view" tabindex="-1"></main>
+
+<div class="tabs">
+  <nav aria-label="Sections">
+    <a href="#home" data-tab="home"><span class="g">ॐ</span>Today</a>
+    <a href="#texts" data-tab="texts"><span class="g">ग्र</span>Texts</a>
+    <a href="#bentov" data-tab="bentov" class="b"><span class="g">◠</span>Bentov</a>
+    <a href="#bridges" data-tab="bridges"><span class="g">⇄</span>Bridges</a>
+    <a href="#study" data-tab="study"><span class="g">अ</span>Study</a>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ------------------------------------------------------------------
+   CONTENT
+   Sanskrit is the traditional text. English renderings and notes are
+   original study paraphrases, not quotations from any translation.
+   Bentov material is summarised in our own words; read his books for
+   his actual arguments.
+------------------------------------------------------------------- */
+const TEXTS = [
+ {id:"rigveda", group:"Vedas", name:"Ṛg Veda", dev:"ऋग्वेद",
+  blurb:"The oldest of the four Vedas: 1,028 hymns in ten maṇḍalas (books), addressed to the powers of nature and, in the late hymns, to the One behind them.",
+  verses:[
+   {id:"rv-1-164-46", ref:"Ṛg Veda 1.164.46",
+    dev:"एकं सद् विप्रा बहुधा वदन्ति ।\nअग्निं यमं मातरिश्वानमाहुः ॥",
+    iast:"ekaṃ sad viprā bahudhā vadanti |\nagniṃ yamaṃ mātariśvānam āhuḥ ||",
+    tr:"What is, is one. The wise speak of it in many ways, calling it Agni, Yama, Mātariśvan.",
+    note:"The seed of Vedānta's non-dualism sits inside a hymn to many gods: the gods are names for one reality seen from different angles.",
+    bentov:"Bentov's picture is similar in shape: one underlying field, perceived as many 'realities' depending on the frequency range an observer can tune to."},
+   {id:"rv-3-62-10", ref:"Ṛg Veda 3.62.10 · Gāyatrī",
+    dev:"तत्सवितुर्वरेण्यं भर्गो देवस्य धीमहि ।\nधियो यो नः प्रचोदयात् ॥",
+    iast:"tat savitur vareṇyaṃ bhargo devasya dhīmahi |\ndhiyo yo naḥ pracodayāt ||",
+    tr:"We meditate on the radiant splendour of Savitṛ, the divine impeller. May it set our minds in motion.",
+    note:"The most-recited Vedic verse. Savitṛ is the sun as the power that stirs things into activity. The prayer is for clarity of mind (dhī), not for objects."},
+   {id:"rv-10-90-1", ref:"Ṛg Veda 10.90.1 · Puruṣa Sūkta",
+    dev:"सहस्रशीर्षा पुरुषः सहस्राक्षः सहस्रपात् ।\nस भूमिं विश्वतो वृत्वात्यतिष्ठद्दशाङ्गुलम् ॥",
+    iast:"sahasraśīrṣā puruṣaḥ sahasrākṣaḥ sahasrapāt |\nsa bhūmiṃ viśvato vṛtvā atyatiṣṭhad daśāṅgulam ||",
+    tr:"The cosmic Person has a thousand heads, a thousand eyes, a thousand feet. Covering the earth on every side, it extends ten fingers' breadth beyond.",
+    note:"The universe is one body that both fills the world and exceeds it. Later Vedānta reads this as Brahman being immanent and transcendent at once.",
+    bentov:"Compare the hologram, a favourite image of Bentov's: every part of the plate carries the whole. Here every head, eye and foot belongs to one Person."},
+   {id:"rv-10-129-1", ref:"Ṛg Veda 10.129.1 · Nāsadīya Sūkta",
+    dev:"नासदासीन्नो सदासीत्तदानीं\nनासीद्रजो नो व्योमा परो यत् ।",
+    iast:"nāsad āsīn no sad āsīt tadānīṃ\nnāsīd rajo no vyomā paro yat |",
+    tr:"Then there was neither non-being nor being. There was no airy space, and no sky beyond it.",
+    note:"The Creation Hymn starts before the pair 'exists / does not exist' has any meaning. It is a hymn of questions, not answers.",
+    bentov:"Bentov's 'A Cosmic Book' begins in a similar place: an undifferentiated, motionless Absolute before any vibration starts."},
+   {id:"rv-10-129-7", ref:"Ṛg Veda 10.129.7 · Nāsadīya Sūkta",
+    dev:"इयं विसृष्टिर्यत आबभूव यदि वा दधे यदि वा न ।\nयो अस्याध्यक्षः परमे व्योमन्त्सो अङ्ग वेद यदि वा न वेद ॥",
+    iast:"iyaṃ visṛṣṭir yata ābabhūva yadi vā dadhe yadi vā na |\nyo asyādhyakṣaḥ parame vyoman so aṅga veda yadi vā na veda ||",
+    tr:"Where this creation came from, whether it was made or not, only the overseer in the highest heaven knows. Or perhaps even that one does not know.",
+    note:"A rare scripture that ends in honest uncertainty. A good verse to hold whenever any model, ancient or modern, starts to feel final."}
+  ]},
+ {id:"samaveda", group:"Vedas", name:"Sāma Veda", dev:"सामवेद",
+  blurb:"The Veda of melody. Most of its verses come from the Ṛg Veda, set to chant for the soma ritual. The Chāndogya Upaniṣad belongs to this Veda.",
+  verses:[
+   {id:"sv-1-1-1", ref:"Sāma Veda, Pūrvārcika 1.1.1",
+    dev:"अग्न आ याहि वीतये गृणानो हव्यदातये ।\nनि होता सत्सि बर्हिषि ॥",
+    iast:"agna ā yāhi vītaye gṛṇāno havyadātaye |\nni hotā satsi barhiṣi ||",
+    tr:"Agni, come to the feast, praised, to carry the offering. Sit down as the priest on the sacred grass.",
+    note:"The opening chant. In the Sāma tradition the sound and melody matter as much as the meaning; the words are carried on the tune.",
+    bentov:"Bentov treated sound as one of many vibrations that can entrain the body and nervous system. Chant is one of the oldest uses of that idea."}
+  ]},
+ {id:"yajurveda", group:"Vedas", name:"Yajur Veda", dev:"यजुर्वेद",
+  blurb:"The Veda of ritual formulas, in a Black (Kṛṣṇa) and a White (Śukla) recension. The Īśa and Bṛhadāraṇyaka Upaniṣads belong to the White Yajur Veda.",
+  verses:[
+   {id:"yv-purnam", ref:"Śānti mantra · Bṛhadāraṇyaka Up. 5.1.1",
+    dev:"ॐ पूर्णमदः पूर्णमिदं पूर्णात्पूर्णमुदच्यते ।\nपूर्णस्य पूर्णमादाय पूर्णमेवावशिष्यते ॥",
+    iast:"oṃ pūrṇam adaḥ pūrṇam idaṃ pūrṇāt pūrṇam udacyate |\npūrṇasya pūrṇam ādāya pūrṇam evāvaśiṣyate ||",
+    tr:"That is whole. This is whole. From the whole, the whole comes out. Take the whole from the whole, and the whole remains.",
+    note:"'That' is the unmanifest, 'this' is the manifest world. Infinity minus infinity is still infinity: creation takes nothing away from its source.",
+    bentov:"This is the closest Vedic match to Bentov's hologram: cut the plate in pieces and each piece still shows the whole image."},
+   {id:"yv-asato", ref:"Bṛhadāraṇyaka Up. 1.3.28 · Pavamāna mantra",
+    dev:"असतो मा सद्गमय ।\nतमसो मा ज्योतिर्गमय ।\nमृत्योर्मा अमृतं गमय ॥",
+    iast:"asato mā sad gamaya |\ntamaso mā jyotir gamaya |\nmṛtyor mā amṛtaṃ gamaya ||",
+    tr:"Lead me from the unreal to the real. Lead me from darkness to light. Lead me from death to the deathless.",
+    note:"Three steps, one movement: each line names the same journey from the changing to the unchanging."}
+  ]},
+ {id:"atharvaveda", group:"Vedas", name:"Atharva Veda", dev:"अथर्ववेद",
+  blurb:"The Veda of daily life: healing, protection, household and earth. The Muṇḍaka and Māṇḍūkya Upaniṣads belong to it.",
+  verses:[
+   {id:"av-12-1-12", ref:"Atharva Veda 12.1.12 · Bhūmi Sūkta",
+    dev:"माता भूमिः पुत्रो अहं पृथिव्याः ।",
+    iast:"mātā bhūmiḥ putro ahaṃ pṛthivyāḥ |",
+    tr:"The Earth is my mother; I am a child of the Earth.",
+    note:"From the 63-verse Hymn to the Earth, one of the earliest expressions of ecological kinship in any literature.",
+    bentov:"Bentov suggested that in deep meditation the body's heart–aorta rhythm settles near 7 cycles a second, close to the Earth–ionosphere resonance (the Schumann resonance). He offered this as a hypothesis, not a finding."}
+  ]},
+ {id:"isha", group:"Upaniṣads", name:"Īśa Upaniṣad", dev:"ईशोपनिषद्",
+  blurb:"Eighteen verses, the 40th chapter of the White Yajur Veda. Short, dense and often placed first among the principal Upaniṣads.",
+  verses:[
+   {id:"isha-1", ref:"Īśa Upaniṣad 1",
+    dev:"ईशा वास्यमिदं सर्वं यत्किञ्च जगत्यां जगत् ।\nतेन त्यक्तेन भुञ्जीथा मा गृधः कस्यस्विद्धनम् ॥",
+    iast:"īśā vāsyam idaṃ sarvaṃ yat kiñca jagatyāṃ jagat |\ntena tyaktena bhuñjīthā mā gṛdhaḥ kasya svid dhanam ||",
+    tr:"All of this, whatever moves in this moving world, is to be clothed in the Lord. Enjoy it by letting go. Do not covet: whose wealth is it, after all?",
+    note:"Renunciation here is a way of enjoying, not a refusal to enjoy. Letting go of ownership is what lets the world be seen as it is."},
+   {id:"isha-4", ref:"Īśa Upaniṣad 4",
+    dev:"अनेजदेकं मनसो जवीयो नैनद्देवा आप्नुवन्पूर्वमर्षत् ।",
+    iast:"anejad ekaṃ manaso javīyo nainad devā āpnuvan pūrvam arṣat |",
+    tr:"The One does not stir, yet it is swifter than the mind. The senses cannot catch it; it is always already ahead.",
+    note:"Unmoving and faster than thought at once. The paradox is the teaching: the Self is not located anywhere it would need to travel from.",
+    bentov:"This is Bentov's pendulum in a single line. He proposed that at the still point of every oscillation, where speed drops to zero, an object is momentarily in touch with the Absolute, which he described as both total rest and unlimited speed."},
+   {id:"isha-5", ref:"Īśa Upaniṣad 5",
+    dev:"तदेजति तन्नैजति तद्दूरे तद्वन्तिके ।\nतदन्तरस्य सर्वस्य तदु सर्वस्यास्य बाह्यतः ॥",
+    iast:"tad ejati tan naijati tad dūre tad v antike |\ntad antar asya sarvasya tad u sarvasyāsya bāhyataḥ ||",
+    tr:"It moves, and it does not move. It is far, and it is near. It is inside all of this, and it is outside all of this.",
+    note:"Every pair of opposites is applied and then both are kept. The verse trains the mind to stop choosing one side.",
+    bentov:"Bentov's whole model hangs on this pairing: motion (the relative world of vibration) resting on stillness (the Absolute), with every swing touching stillness at its turning points."}
+  ]},
+ {id:"kena", group:"Upaniṣads", name:"Kena Upaniṣad", dev:"केनोपनिषद्",
+  blurb:"'By whom?' The Upaniṣad that asks what makes the mind think and the eye see.",
+  verses:[
+   {id:"kena-1-5", ref:"Kena Upaniṣad 1.5",
+    dev:"यद्वाचानभ्युदितं येन वागभ्युद्यते ।\nतदेव ब्रह्म त्वं विद्धि नेदं यदिदमुपासते ॥",
+    iast:"yad vācānabhyuditaṃ yena vāg abhyudyate |\ntad eva brahma tvaṃ viddhi nedaṃ yad idam upāsate ||",
+    tr:"That which speech cannot express, but by which speech is expressed: know that alone as Brahman, not this that people worship as an object.",
+    note:"Verses 1.5 to 1.9 repeat the pattern for mind, eye, ear and breath. Brahman is the knower, never one more thing known.",
+    bentov:"Bentov defined consciousness by what it does: a system's capacity to respond. Kena points the other way, at the awareness that is present before any response. Notice the difference."}
+  ]},
+ {id:"katha", group:"Upaniṣads", name:"Kaṭha Upaniṣad", dev:"कठोपनिषद्",
+  blurb:"The boy Naciketas questions Death himself about what survives the body.",
+  verses:[
+   {id:"katha-1-3-3", ref:"Kaṭha Upaniṣad 1.3.3",
+    dev:"आत्मानं रथिनं विद्धि शरीरं रथमेव तु ।\nबुद्धिं तु सारथिं विद्धि मनः प्रग्रहमेव च ॥",
+    iast:"ātmānaṃ rathinaṃ viddhi śarīraṃ ratham eva tu |\nbuddhiṃ tu sārathiṃ viddhi manaḥ pragraham eva ca ||",
+    tr:"Know the Self as the rider in the chariot and the body as the chariot. Know the intellect as the driver and the mind as the reins.",
+    note:"The next verse adds the senses as horses and their objects as the road. The model is practical: train the driver, and the horses follow."},
+   {id:"katha-1-3-14", ref:"Kaṭha Upaniṣad 1.3.14",
+    dev:"उत्तिष्ठत जाग्रत प्राप्य वरान्निबोधत ।\nक्षुरस्य धारा निशिता दुरत्यया दुर्गं पथस्तत्कवयो वदन्ति ॥",
+    iast:"uttiṣṭhata jāgrata prāpya varān nibodhata |\nkṣurasya dhārā niśitā duratyayā durgaṃ pathas tat kavayo vadanti ||",
+    tr:"Arise, awake. Find the great teachers and learn. The sages say the path is as hard to walk as the sharp edge of a razor.",
+    note:"A call to effort and to a teacher. Svādhyāya, self-study, is one limb of practice; it is meant to sit beside guidance, not replace it."}
+  ]},
+ {id:"mundaka", group:"Upaniṣads", name:"Muṇḍaka Upaniṣad", dev:"मुण्डकोपनिषद्",
+  blurb:"Distinguishes lower knowledge (even of the Vedas) from the higher knowledge by which the imperishable is known.",
+  verses:[
+   {id:"mundaka-2-1-1", ref:"Muṇḍaka Upaniṣad 2.1.1",
+    dev:"यथा सुदीप्तात्पावकाद्विस्फुलिङ्गाः सहस्रशः प्रभवन्ते सरूपाः ।\nतथाक्षराद्विविधाः सोम्य भावाः प्रजायन्ते तत्र चैवापियन्ति ॥",
+    iast:"yathā sudīptāt pāvakād visphuliṅgāḥ sahasraśaḥ prabhavante sarūpāḥ |\ntathākṣarād vividhāḥ somya bhāvāḥ prajāyante tatra caivāpiyanti ||",
+    tr:"As thousands of sparks of the same nature fly from a blazing fire, so, dear one, the many kinds of being come out of the Imperishable, and return into it.",
+    note:"Two ideas in one image: the many share the nature of their source, and the movement out is matched by a movement back.",
+    bentov:"Bentov's cosmic model is a breathing one: creation flows out from the Absolute and is drawn back in, over and over."},
+   {id:"mundaka-3-1-1", ref:"Muṇḍaka Upaniṣad 3.1.1",
+    dev:"द्वा सुपर्णा सयुजा सखाया समानं वृक्षं परिषस्वजाते ।\nतयोरन्यः पिप्पलं स्वाद्वत्त्यनश्नन्नन्यो अभिचाकशीति ॥",
+    iast:"dvā suparṇā sayujā sakhāyā samānaṃ vṛkṣaṃ pariṣasvajāte |\ntayor anyaḥ pippalaṃ svādv atty anaśnann anyo abhicākaśīti ||",
+    tr:"Two birds, close companions, perch on the same tree. One eats the sweet fruit; the other does not eat, and simply watches.",
+    note:"The eating bird is the individual self tasting experience; the watching bird is the witness (sākṣī). Both are on one tree, the body.",
+    bentov:"Bentov encouraged meditators to observe the mind's oscillations without riding them, which is the second bird's stance."}
+  ]},
+ {id:"mandukya", group:"Upaniṣads", name:"Māṇḍūkya Upaniṣad", dev:"माण्डूक्योपनिषद्",
+  blurb:"Twelve verses mapping the syllable Om onto waking, dream, deep sleep and the fourth, Turīya. Gauḍapāda's Kārikā on it is a founding text of Advaita.",
+  verses:[
+   {id:"mandukya-1", ref:"Māṇḍūkya Upaniṣad 1",
+    dev:"ओमित्येतदक्षरमिदं सर्वं तस्योपव्याख्यानं\nभूतं भवद्भविष्यदिति सर्वमोङ्कार एव ।",
+    iast:"om ity etad akṣaram idaṃ sarvaṃ tasyopavyākhyānaṃ\nbhūtaṃ bhavad bhaviṣyad iti sarvam oṅkāra eva |",
+    tr:"Om is this imperishable syllable, and all this is its unfolding. Past, present and future are all Om.",
+    note:"A-U-M map to waking, dream and deep sleep. The silence after the sound stands for the fourth.",
+    bentov:"For Bentov, all of creation is vibration at different frequencies. Om as 'all this' fits that picture, though the Upaniṣad uses it as a map of awareness rather than of physics."},
+   {id:"mandukya-2", ref:"Māṇḍūkya Upaniṣad 2",
+    dev:"सर्वं ह्येतद् ब्रह्मायमात्मा ब्रह्म सोऽयमात्मा चतुष्पात् ॥",
+    iast:"sarvaṃ hy etad brahma ayam ātmā brahma so 'yam ātmā catuṣpāt ||",
+    tr:"All this is Brahman. This Self is Brahman. This Self has four quarters.",
+    note:"'Ayam ātmā brahma' is one of the four great sayings (mahāvākya). The 'four quarters' are explained in the verses that follow."},
+   {id:"mandukya-7", ref:"Māṇḍūkya Upaniṣad 7 · Turīya",
+    dev:"नान्तःप्रज्ञं न बहिष्प्रज्ञं नोभयतःप्रज्ञं न प्रज्ञानघनं …\nशान्तं शिवमद्वैतं चतुर्थं मन्यन्ते स आत्मा स विज्ञेयः ॥",
+    iast:"nāntaḥprajñaṃ na bahiṣprajñaṃ nobhayataḥprajñaṃ na prajñānaghanaṃ …\nśāntaṃ śivam advaitaṃ caturthaṃ manyante sa ātmā sa vijñeyaḥ ||",
+    tr:"Not aware of the inner, not aware of the outer, not of both, not a mass of awareness … Peaceful, benign, non-dual: this is called the fourth. That is the Self; that is what is to be known.",
+    note:"Turīya is not a fourth state alongside the other three. It is the ground present through all three.",
+    bentov:"Bentov described expanding levels of consciousness, each able to perceive a wider band of reality. Turīya differs: it is not a higher band but what every band appears in."}
+  ]},
+ {id:"chandogya", group:"Upaniṣads", name:"Chāndogya Upaniṣad", dev:"छान्दोग्योपनिषद्",
+  blurb:"A long Upaniṣad of the Sāma Veda. It contains Uddālaka's teaching to his son Śvetaketu, with its refrain 'you are that'.",
+  verses:[
+   {id:"chandogya-3-14-1", ref:"Chāndogya Upaniṣad 3.14.1",
+    dev:"सर्वं खल्विदं ब्रह्म ।",
+    iast:"sarvaṃ khalv idaṃ brahma |",
+    tr:"All this is indeed Brahman.",
+    note:"From the Śāṇḍilya teaching. The verse goes on to say one should meditate on it as that from which the world arises, in which it lives, and into which it dissolves."},
+   {id:"chandogya-6-8-7", ref:"Chāndogya Upaniṣad 6.8.7",
+    dev:"स य एषोऽणिमैतदात्म्यमिदं सर्वं तत्सत्यं स आत्मा\nतत्त्वमसि श्वेतकेतो ॥",
+    iast:"sa ya eṣo 'ṇimaitadātmyam idaṃ sarvaṃ tat satyaṃ sa ātmā\ntat tvam asi śvetaketo ||",
+    tr:"That finest essence is the Self of all this world. That is the real. That is the Self. You are that, Śvetaketu.",
+    note:"'Tat tvam asi' is repeated nine times, each after an analogy: salt dissolved in water, rivers merging in the sea, the seed of a banyan.",
+    bentov:"The salt-in-water analogy is close to the hologram again: the whole is present at every point, but not visible as a separate thing."}
+  ]},
+ {id:"brihadaranyaka", group:"Upaniṣads", name:"Bṛhadāraṇyaka Upaniṣad", dev:"बृहदारण्यकोपनिषद्",
+  blurb:"The 'great forest teaching', the longest and likely oldest Upaniṣad, home of Yājñavalkya's dialogues.",
+  verses:[
+   {id:"bu-1-4-10", ref:"Bṛhadāraṇyaka Upaniṣad 1.4.10",
+    dev:"अहं ब्रह्मास्मि ।",
+    iast:"ahaṃ brahmāsmi |",
+    tr:"I am Brahman.",
+    note:"A mahāvākya. In context, whoever knows this 'becomes all this', and even the gods cannot stop them, because they have become the gods' own Self."},
+   {id:"bu-2-3-6", ref:"Bṛhadāraṇyaka Upaniṣad 2.3.6",
+    dev:"अथात आदेशो नेति नेति ।",
+    iast:"athāta ādeśo neti neti |",
+    tr:"Now, the teaching: not this, not this.",
+    note:"Brahman is pointed to by negating every description. Nothing you can describe is it, because you are the describer.",
+    bentov:"Bentov's model peels reality in layers, gross to subtle. 'Neti neti' peels too, but it doesn't stop at a subtlest layer; it removes layering itself."}
+  ]},
+ {id:"taittiriya", group:"Upaniṣads", name:"Taittirīya Upaniṣad", dev:"तैत्तिरीयोपनिषद्",
+  blurb:"Source of the five sheaths (pañca-kośa) teaching: food, breath, mind, understanding and bliss.",
+  verses:[
+   {id:"taitt-2-1-1", ref:"Taittirīya Upaniṣad 2.1.1",
+    dev:"सत्यं ज्ञानमनन्तं ब्रह्म ।",
+    iast:"satyaṃ jñānam anantaṃ brahma |",
+    tr:"Brahman is truth, knowledge, the infinite.",
+    note:"The chapter that follows unfolds the five sheaths, each subtler than the last, like layers of a body nested inside the next.",
+    bentov:"Bentov's 'bodies' at rising frequencies (physical, astral, mental, causal) echo the kośa layers. Bentov frames them as frequency bands; the Upaniṣad frames them as layers of identification."}
+  ]},
+ {id:"aitareya", group:"Upaniṣads", name:"Aitareya Upaniṣad", dev:"ऐतरेयोपनिषद्",
+  blurb:"A short Ṛg Veda Upaniṣad on how the Self entered creation.",
+  verses:[
+   {id:"aitareya-3-3", ref:"Aitareya Upaniṣad 3.3",
+    dev:"प्रज्ञानं ब्रह्म ।",
+    iast:"prajñānaṃ brahma |",
+    tr:"Consciousness is Brahman.",
+    note:"The mahāvākya of the Ṛg Veda. Everything in the world is 'guided by consciousness and established in consciousness'.",
+    bentov:"Bentov held that consciousness is present in some degree in everything, down to the atom. This verse goes further: consciousness is not in things; things are in consciousness."}
+  ]},
+ {id:"gita", group:"Bhagavad Gītā", name:"Bhagavad Gītā", dev:"भगवद्गीता",
+  blurb:"Seven hundred verses from the Mahābhārata: Kṛṣṇa teaches Arjuna on the battlefield. One of Vedānta's three foundations (prasthāna-traya).",
+  verses:[
+   {id:"gita-2-20", ref:"Bhagavad Gītā 2.20",
+    dev:"न जायते म्रियते वा कदाचिन्नायं भूत्वा भविता वा न भूयः ।\nअजो नित्यः शाश्वतोऽयं पुराणो न हन्यते हन्यमाने शरीरे ॥",
+    iast:"na jāyate mriyate vā kadācin nāyaṃ bhūtvā bhavitā vā na bhūyaḥ |\najo nityaḥ śāśvato 'yaṃ purāṇo na hanyate hanyamāne śarīre ||",
+    tr:"It is never born, and it never dies. It did not come into being and will not cease to be. Unborn, eternal, everlasting and ancient, it is not killed when the body is killed.",
+    note:"Close to Kaṭha Up. 1.2.18. The Gītā borrows freely from the Upaniṣads; reading them together shows how."},
+   {id:"gita-2-47", ref:"Bhagavad Gītā 2.47",
+    dev:"कर्मण्येवाधिकारस्ते मा फलेषु कदाचन ।\nमा कर्मफलहेतुर्भूर्मा ते सङ्गोऽस्त्वकर्मणि ॥",
+    iast:"karmaṇy evādhikāras te mā phaleṣu kadācana |\nmā karmaphalahetur bhūr mā te saṅgo 'stv akarmaṇi ||",
+    tr:"Your claim is on the action alone, never on its fruits. Don't let results be your motive, and don't let yourself cling to doing nothing.",
+    note:"Both errors are named: working for the payoff, and withdrawing from work. The way between them is karma yoga."},
+   {id:"gita-2-48", ref:"Bhagavad Gītā 2.48",
+    dev:"योगस्थः कुरु कर्माणि सङ्गं त्यक्त्वा धनञ्जय ।\nसिद्ध्यसिद्ध्योः समो भूत्वा समत्वं योग उच्यते ॥",
+    iast:"yogasthaḥ kuru karmāṇi saṅgaṃ tyaktvā dhanañjaya |\nsiddhy-asiddhyoḥ samo bhūtvā samatvaṃ yoga ucyate ||",
+    tr:"Established in yoga, act, Arjuna, without attachment. Stay even in success and failure. Evenness is called yoga.",
+    note:"Samatva, evenness, is the Gītā's first definition of yoga.",
+    bentov:"Success and failure are the two ends of a swing. Bentov's practice was to rest at the turning point rather than be thrown from end to end."},
+   {id:"gita-4-18", ref:"Bhagavad Gītā 4.18",
+    dev:"कर्मण्यकर्म यः पश्येदकर्मणि च कर्म यः ।\nस बुद्धिमान्मनुष्येषु स युक्तः कृत्स्नकर्मकृत् ॥",
+    iast:"karmaṇy akarma yaḥ paśyed akarmaṇi ca karma yaḥ |\nsa buddhimān manuṣyeṣu sa yuktaḥ kṛtsnakarmakṛt ||",
+    tr:"One who sees inaction in action, and action in inaction, is wise among people. That one is a yogi, even while doing everything.",
+    note:"The Self never acts, even when the body is busy; the body is always acting, even when one sits still.",
+    bentov:"Stillness inside motion is the pendulum's turning point again, read as a way of working rather than of meditating."},
+   {id:"gita-6-19", ref:"Bhagavad Gītā 6.19",
+    dev:"यथा दीपो निवातस्थो नेङ्गते सोपमा स्मृता ।\nयोगिनो यतचित्तस्य युञ्जतो योगमात्मनः ॥",
+    iast:"yathā dīpo nivātastho neṅgate sopamā smṛtā |\nyogino yatacittasya yuñjato yogam ātmanaḥ ||",
+    tr:"A lamp in a windless place does not flicker. That is the image for the yogi whose mind is steady, practising union with the Self.",
+    note:"The image is not of an extinguished flame but of a still one: fully burning, not disturbed.",
+    bentov:"Bentov's account of meditation is of oscillations damping down until the system nearly rests. The windless flame is the same picture."},
+   {id:"gita-7-8", ref:"Bhagavad Gītā 7.8",
+    dev:"रसोऽहमप्सु कौन्तेय प्रभास्मि शशिसूर्ययोः ।\nप्रणवः सर्ववेदेषु शब्दः खे पौरुषं नृषु ॥",
+    iast:"raso 'ham apsu kaunteya prabhāsmi śaśisūryayoḥ |\npraṇavaḥ sarvavedeṣu śabdaḥ khe pauruṣaṃ nṛṣu ||",
+    tr:"I am the taste in water, Arjuna, the light of moon and sun, the Om in all the Vedas, the sound in space, the vigour in people.",
+    note:"Kṛṣṇa names himself as the essential quality of each thing. Sound (śabda) is the quality of ākāśa, space.",
+    bentov:"Sound in space, Om in the Vedas: in Bentov's terms, the basic vibration that every form is a variation on."},
+   {id:"gita-8-17", ref:"Bhagavad Gītā 8.17",
+    dev:"सहस्रयुगपर्यन्तमहर्यद्ब्रह्मणो विदुः ।\nरात्रिं युगसहस्रान्तां तेऽहोरात्रविदो जनाः ॥",
+    iast:"sahasrayugaparyantam ahar yad brahmaṇo viduḥ |\nrātriṃ yugasahasrāntāṃ te 'horātravido janāḥ ||",
+    tr:"Those who know that a day of Brahmā lasts a thousand ages, and his night a thousand ages, truly know day and night.",
+    note:"Time is relative to the one who experiences it: a human lifetime is a moment in Brahmā's day. The next verses describe worlds emerging at dawn and dissolving at nightfall.",
+    bentov:"Two Bentov themes at once: subjective time that stretches and shrinks with consciousness, and a universe that expands and contracts in cycles."}
+  ]},
+ {id:"brahmasutra", group:"Vedānta", name:"Brahma Sūtra", dev:"ब्रह्मसूत्र",
+  blurb:"Bādarāyaṇa's 555 aphorisms that systematise the Upaniṣads. The third of Vedānta's foundations; every school writes a commentary on it.",
+  verses:[
+   {id:"bs-1-1-1", ref:"Brahma Sūtra 1.1.1",
+    dev:"अथातो ब्रह्मजिज्ञासा ।",
+    iast:"athāto brahmajijñāsā |",
+    tr:"Now, therefore, the inquiry into Brahman.",
+    note:"'Now' means: after preparation (discernment, dispassion, discipline, desire for freedom). 'Therefore' means: because other ends prove impermanent."},
+   {id:"bs-1-1-2", ref:"Brahma Sūtra 1.1.2",
+    dev:"जन्माद्यस्य यतः ।",
+    iast:"janmādy asya yataḥ |",
+    tr:"Brahman is that from which the birth, sustenance and dissolution of this world come.",
+    note:"A definition by function, drawing on Taittirīya Up. 3.1. It points to Brahman through the world's cycle without describing Brahman itself."}
+  ]},
+ {id:"shankara", group:"Vedānta", name:"Śaṅkara", dev:"शङ्कराचार्य",
+  blurb:"Ādi Śaṅkara (c. 8th century) gave Advaita Vedānta its classic form. Several popular works are traditionally attributed to him.",
+  verses:[
+   {id:"shankara-brahma-satyam", ref:"Attributed to Śaṅkara · Brahma-jñānāvalī-mālā 20",
+    dev:"ब्रह्म सत्यं जगन्मिथ्या जीवो ब्रह्मैव नापरः ।",
+    iast:"brahma satyaṃ jagan mithyā jīvo brahmaiva nāparaḥ |",
+    tr:"Brahman is real; the world is mithyā (dependent, not independently real); the individual is Brahman alone, nothing else.",
+    note:"Mithyā doesn't mean 'non-existent'. It means real only on borrowed being, like a wave that exists only as water.",
+    bentov:"Bentov's 'relative realities' are real at their own level and dependent on the Absolute. That sits close to mithyā, provided it isn't read as 'illusion = nothing'."},
+   {id:"vc-20", ref:"Vivekacūḍāmaṇi 20",
+    dev:"ब्रह्म सत्यं जगन्मिथ्येत्येवंरूपो विनिश्चयः ।\nसोऽयं नित्यानित्यवस्तुविवेकः समुदाहृतः ॥",
+    iast:"brahma satyaṃ jagan mithyety evaṃrūpo viniścayaḥ |\nso 'yaṃ nityānityavastuvivekaḥ samudāhṛtaḥ ||",
+    tr:"The firm conviction that Brahman is real and the world is dependent: this is called discernment between the eternal and the passing.",
+    note:"Viveka, the first of the four qualifications for inquiry. It is a settled understanding, not a mood."},
+   {id:"nirvana-1", ref:"Nirvāṇa Ṣaṭkam 1",
+    dev:"मनोबुद्ध्यहङ्कारचित्तानि नाहं …\nचिदानन्दरूपः शिवोऽहम् शिवोऽहम् ॥",
+    iast:"mano-buddhy-ahaṅkāra-cittāni nāham …\ncid-ānanda-rūpaḥ śivo 'ham śivo 'ham ||",
+    tr:"I am not mind, intellect, ego or memory … I am of the nature of awareness and bliss. I am Śiva, I am Śiva.",
+    note:"Six verses of 'neti neti' sung in the first person, each ending in the same refrain."}
+  ]},
+ {id:"ashtavakra", group:"Vedānta", name:"Aṣṭāvakra Gītā", dev:"अष्टावक्रगीता",
+  blurb:"A radical non-dual dialogue between the sage Aṣṭāvakra and King Janaka. It skips method and points directly.",
+  verses:[
+   {id:"av-gita-1-11", ref:"Aṣṭāvakra Gītā 1.11",
+    dev:"मुक्ताभिमानी मुक्तो हि बद्धो बद्धाभिमान्यपि ।\nकिंवदन्तीह सत्येयं या मतिः सा गतिर्भवेत् ॥",
+    iast:"muktābhimānī mukto hi baddho baddhābhimāny api |\nkiṃvadantīha satyeyaṃ yā matiḥ sā gatir bhavet ||",
+    tr:"One who takes oneself to be free is free; one who takes oneself to be bound is bound. The saying is true: as you think, so you become.",
+    note:"Bondage is presented as a belief about oneself, which is why knowledge, not effort, frees."}
+  ]},
+ {id:"yogasutra", group:"Related", name:"Yoga Sūtra", dev:"योगसूत्र",
+  blurb:"Patañjali's 196 aphorisms. Not Vedānta, but its meditation vocabulary runs through every later tradition, and through Bentov.",
+  verses:[
+   {id:"ys-1-2", ref:"Yoga Sūtra 1.2",
+    dev:"योगश्चित्तवृत्तिनिरोधः ॥",
+    iast:"yogaś citta-vṛtti-nirodhaḥ ||",
+    tr:"Yoga is the stilling of the movements of the mind.",
+    note:"Vṛtti literally means 'turning' or 'whirl'. Sūtra 1.3 says: then the seer rests in its own nature.",
+    bentov:"Bentov's language for the same thing is mechanical: as the mind's oscillations quiet, awareness can rest in the stillness between them."}
+  ]}
+];
+
+const BRIDGES = [
+ {id:"still-point", v:"Moves and moves not", vdev:"तदेजति तन्नैजति", b:"The pendulum's rest point",
+  vtxt:"The Īśa Upaniṣad says the One is unmoving and yet faster than the mind; it moves and does not move. The Gītā asks us to see inaction in action, and offers the windless lamp as the image of a steady mind.",
+  btxt:"Every oscillation, from a pendulum to an atom, slows to zero at each end of its swing. Bentov proposed that in that instant of rest the object touches the Absolute, and that meditation is learning to stay aware through those still points.",
+  diff:"For the Upaniṣad, Brahman never moves at all; it is not a phase of a cycle. Bentov's rest point is a recurring moment inside motion. Read it as a doorway image, not as the Absolute itself.",
+  links:["isha-4","isha-5","gita-4-18","gita-6-19"]},
+ {id:"vibration", v:"Nāda and Om", vdev:"नाद · ॐ", b:"Everything is vibration",
+  vtxt:"Om is called 'all this', past, present and future. Kṛṣṇa is 'the sound in space'. Sound (śabda) is the quality of ākāśa, the subtlest element. Later yoga speaks of nāda, the inner sound.",
+  btxt:"Bentov describes matter, light, sound and thought as vibration at different frequencies. Denser realities vibrate slower; subtler ones faster; the Absolute does not vibrate.",
+  diff:"In the Māṇḍūkya, Om is a map of awareness (waking, dream, sleep, the fourth), not a frequency. The physics analogy helps intuition but is not what the text claims.",
+  links:["mandukya-1","gita-7-8","sv-1-1-1"]},
+ {id:"whole-in-part", v:"Pūrṇam: the whole in every part", vdev:"पूर्णमदः पूर्णमिदम्", b:"The holographic universe",
+  vtxt:"'From the whole the whole comes, and the whole remains.' 'You are that.' The cosmic Person has a thousand eyes, all its own. Salt dissolved in water is present in every sip.",
+  btxt:"A hologram stores the whole image across the plate as an interference pattern, so any piece reconstructs the whole. Bentov used this as a model for how each part of the universe, and each mind, contains information about all of it.",
+  diff:"A hologram fragment shows the whole at lower resolution. Vedānta says the Self is not a partial copy of Brahman; it is Brahman, entirely.",
+  links:["yv-purnam","chandogya-6-8-7","rv-10-90-1"]},
+ {id:"states", v:"Turīya, the fourth", vdev:"तुरीय", b:"Levels of consciousness",
+  vtxt:"The Māṇḍūkya names three states (waking, dream, deep sleep) and a fourth, Turīya, which is not a state but the peaceful, non-dual ground of all three.",
+  btxt:"Bentov describes consciousness expanding through levels, each able to perceive and respond to a wider band of reality, up to cosmic consciousness.",
+  diff:"Bentov's levels form a ladder; Turīya is not the top rung. It is the awareness present on every rung. Use Bentov to understand growth, and the Māṇḍūkya to understand what does not grow.",
+  links:["mandukya-2","mandukya-7","ys-1-2"]},
+ {id:"maya", v:"Māyā and mithyā", vdev:"माया · मिथ्या", b:"Relative realities",
+  vtxt:"Śaṅkara: Brahman is real, the world is mithyā, real on borrowed being. 'Neti neti' strips away every description. Discernment (viveka) sorts the lasting from the passing.",
+  btxt:"Bentov points out that solid matter is mostly empty space filled with oscillating fields. Each level of reality is real for those tuned to it, and all of them are relative to the Absolute.",
+  diff:"Śaṅkara's argument is about dependence (what has its own being and what doesn't), not about physics. Matter being 'mostly empty' would not make it mithyā; being dependent does.",
+  links:["shankara-brahma-satyam","vc-20","bu-2-3-6"]},
+ {id:"cycles", v:"Day and night of Brahmā", vdev:"ब्रह्मणः अहोरात्र", b:"The breathing cosmic egg",
+  vtxt:"Worlds emerge at Brahmā's dawn and dissolve at his nightfall, a thousand ages each. Sparks fly from the fire and return to it. Before all this, neither being nor non-being.",
+  btxt:"In 'A Cosmic Book', Bentov and Mirtala draw the universe as a torus, a 'cosmic egg', with creation pouring out of the Absolute at one pole and drawn back in at the other, in cycles.",
+  diff:"Purāṇic cosmology describes cycles of time; Bentov describes a geometry. The torus is his own speculative model, not a Vedic diagram.",
+  links:["gita-8-17","mundaka-2-1-1","rv-10-129-1","rv-10-129-7"]},
+ {id:"time", v:"Relative time", vdev:"काल", b:"Subjective time",
+  vtxt:"A human life is a blink in Brahmā's day. 'Those who know this know day and night.' Time is measured relative to the one who lives it.",
+  btxt:"Bentov ran simple experiments in which people estimate the passing of time with eyes closed, and argued that in altered states subjective time expands relative to clock time.",
+  diff:"The Gītā is making a point about scale and impermanence, not about perception. The link is suggestive rather than direct.",
+  links:["gita-8-17"]},
+ {id:"kundalini", v:"Kuṇḍalinī", vdev:"कुण्डलिनी", b:"The physio-kundalini model",
+  vtxt:"Kuṇḍalinī, energy coiled at the base of the spine, comes from Tantra and Haṭha Yoga rather than the principal Upaniṣads. The texts here supply its context: a still mind (Yoga Sūtra 1.2) and a steady flame (Gītā 6.19).",
+  btxt:"Bentov proposed a mechanical account: in deep meditation the heart–aorta system can settle into a resonance near 7 Hz, setting up standing waves that stimulate the brain's sensory cortex in a loop, which could produce sensations traditionally called kuṇḍalinī rising.",
+  diff:"This is a hypothesis Bentov offered in an appendix, not established physiology. It's useful as a way to make unusual sensations less frightening; don't read it as a description of what the tradition means by kuṇḍalinī.",
+  links:["ys-1-2","gita-6-19","av-12-1-12"]},
+ {id:"witness", v:"Sākṣī, the witness", vdev:"साक्षी", b:"Consciousness as response",
+  vtxt:"Two birds on one tree: one eats, one watches. That by which speech is spoken is Brahman, not what is spoken about. Consciousness is Brahman.",
+  btxt:"Bentov defined consciousness by its capacity to respond to stimuli, and held that everything, even an atom, has some degree of it.",
+  diff:"This is a real disagreement worth sitting with. For Bentov, more responsiveness means more consciousness. For Vedānta, the witness does not respond at all; responding belongs to the mind, which the witness illuminates.",
+  links:["mundaka-3-1-1","kena-1-5","aitareya-3-3"]}
+];
+
+const GLOSSARY = [
+ ["Brahman","ब्रह्मन्","The infinite, unchanging reality that is the ground of everything."],
+ ["Ātman","आत्मन्","The Self: pure awareness at the core of a being, identical with Brahman in Advaita."],
+ ["Māyā","माया","The power by which the one appears as many; also the appearance itself."],
+ ["Mithyā","मिथ्या","Neither real nor unreal: having being only on loan, as a wave from water."],
+ ["Avidyā","अविद्या","Ignorance: not knowing one's own nature, taking the Self to be body and mind."],
+ ["Viveka","विवेक","Discernment between the eternal and the passing."],
+ ["Vairāgya","वैराग्य","Dispassion: the fading of craving for what is passing."],
+ ["Mokṣa","मोक्ष","Liberation: freedom from the cycle of birth and death, through knowledge of the Self."],
+ ["Saṃsāra","संसार","The cycle of repeated birth, death and rebirth."],
+ ["Karma","कर्म","Action, and the results that follow from it."],
+ ["Dharma","धर्म","Right order: duty, law and the way things hold together."],
+ ["Ṛta","ऋत","The cosmic order of the Ṛg Veda, the precursor of dharma."],
+ ["Turīya","तुरीय","'The fourth': the non-dual awareness underlying waking, dream and deep sleep."],
+ ["Sākṣī","साक्षी","The witness: awareness that observes without participating."],
+ ["Prāṇa","प्राण","Breath; life-force; the vital energy that animates the body."],
+ ["Nāda","नाद","Sound, especially the inner, unstruck sound heard in meditation."],
+ ["Ākāśa","आकाश","Space, the subtlest of the five elements, whose quality is sound."],
+ ["Oṃ","ॐ","The sacred syllable; in the Māṇḍūkya, a map of the four states of awareness."],
+ ["Kośa","कोश","Sheath: one of five layers covering the Self (food, breath, mind, intellect, bliss)."],
+ ["Samādhi","समाधि","Absorption: the mind fully still and one with its object."],
+ ["Kuṇḍalinī","कुण्डलिनी","'The coiled one': latent energy at the base of the spine in Tantra and Haṭha Yoga."],
+ ["Sat-cit-ānanda","सच्चिदानन्द","Being, awareness, bliss: the classic pointer to Brahman's nature."],
+ ["Nirguṇa","निर्गुण","Without qualities: Brahman beyond all attributes."],
+ ["Saguṇa","सगुण","With qualities: Brahman as personal God, Īśvara."],
+ ["Puruṣa","पुरुष","The cosmic Person (Ṛg Veda); pure consciousness (Sāṅkhya)."],
+ ["Prakṛti","प्रकृति","Nature, matter: the field of change, made of the three guṇas."],
+ ["Guṇa","गुण","Strand or quality of nature: sattva (clarity), rajas (activity), tamas (inertia)."],
+ ["Līlā","लीला","Play: creation as the spontaneous sport of the divine."],
+ ["Pūrṇa","पूर्ण","Full, whole, complete."],
+ ["Mahāvākya","महावाक्य","A 'great saying' of the Upaniṣads, such as 'tat tvam asi'."],
+ ["Śruti","श्रुति","'What is heard': the revealed texts (Vedas, Upaniṣads)."],
+ ["Smṛti","स्मृति","'What is remembered': texts of human authorship, such as the Gītā and epics."],
+ ["Svādhyāya","स्वाध्याय","Self-study: recitation and study of scripture, and study of oneself."],
+ ["Kalpa","कल्प","An aeon: a day of Brahmā, at whose end the worlds dissolve."]
+];
+
+const BENTOV_IDEAS = [
+ {t:"Everything is vibration", d:"Matter, sound, light and thought are all oscillations; what differs is the frequency and the medium. Lower frequencies make up the dense, physical world. Higher frequencies make up subtler realities. The Absolute is beyond vibration altogether.", links:["mandukya-1","gita-7-8"]},
+ {t:"The rest point of the pendulum", d:"At each end of its swing a pendulum stops for an instant before reversing. Bentov proposed that every vibrating thing passes through such still points, and that in them it is momentarily in touch with the Absolute. Matter, on this view, keeps flickering between motion and rest.", links:["isha-4","isha-5"]},
+ {t:"Meditation as learning to rest", d:"In meditation the mind's oscillations quiet. Bentov suggested that consciousness can gradually extend into the rest periods between oscillations, gaining access to wider levels of reality.", links:["ys-1-2","gita-6-19"]},
+ {t:"Subjective time", d:"With simple timing experiments, Bentov argued that time as we experience it can stretch far beyond clock time in altered states, and that consciousness itself sets the rate.", links:["gita-8-17"]},
+ {t:"The holographic universe", d:"Using the hologram as a model, he described the universe as an interference pattern of vibrations, in which every part carries information about the whole. Our nervous systems, he suggested, read and decode that pattern.", links:["yv-purnam","chandogya-6-8-7"]},
+ {t:"Consciousness in everything", d:"Bentov defined consciousness as the capacity of a system to respond to its environment. Even an atom responds a little, so everything is conscious to some degree, and evolution is consciousness growing in range.", links:["aitareya-3-3","kena-1-5"]},
+ {t:"Micromotion and physio-kundalini", d:"The body moves very slightly with each heartbeat. In deep, quiet meditation he proposed that the heart–aorta system can fall into a resonance near 7 Hz, which could drive standing waves in the head and stimulate the sensory cortex, producing the sensations described as kuṇḍalinī rising.", links:["ys-1-2","av-12-1-12"]},
+ {t:"The cosmic egg", d:"In 'A Cosmic Book' the universe is drawn as a torus: creation flows out of the Absolute at one pole, evolves, and is drawn back in at the other. Creation, in this telling, is the Absolute coming to know itself through its creatures.", links:["mundaka-2-1-1","rv-10-129-1"]}
+];
+
+/* ------------------------------------------------------------------ */
+const ALL = []; const BY_ID = {}; const TEXT_OF = {};
+TEXTS.forEach(t => t.verses.forEach(v => { ALL.push(v); BY_ID[v.id] = v; TEXT_OF[v.id] = t; }));
+const GROUPS = [...new Set(TEXTS.map(t => t.group))];
+
+/* storage, always guarded */
+const KEY = "svadhyaya.v1";
+let S = {bm:[], done:[], notes:{}, box:{}, last:null, studyTab:"glossary", theme:null};
+try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(S, JSON.parse(raw)); } catch(e) {}
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {} }
+
+const h = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const br = s => h(s).replace(/\n/g, "<br>");
+const $ = sel => document.querySelector(sel);
+const view = $("#view");
+
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("show"),1600); }
+
+/* theme toggle: none → follow system; then explicit */
+function applyTheme(){ if (S.theme) document.documentElement.setAttribute("data-theme", S.theme); else document.documentElement.removeAttribute("data-theme"); }
+applyTheme();
+$("#themeBtn").addEventListener("click", () => {
+  const sysDark = matchMedia("(prefers-color-scheme: dark)").matches;
+  const cur = S.theme || (sysDark ? "dark" : "light");
+  S.theme = cur === "dark" ? "light" : "dark"; save(); applyTheme();
+  toast(S.theme === "dark" ? "Dark theme" : "Light theme");
+});
+
+/* ------------------------------------------------------------------ icons */
+const I = {
+ bm:'<svg class="fillable" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>',
+ ok:'<svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>',
+ pen:'<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>',
+ copy:'<svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>'
+};
+const knot = '<svg class="knot" viewBox="0 0 28 28" aria-hidden="true"><circle cx="10" cy="14" r="7" fill="none" stroke="var(--saffron)" stroke-width="2"/><circle cx="18" cy="14" r="7" fill="none" stroke="var(--teal)" stroke-width="2"/></svg>';
+
+/* ------------------------------------------------------------------ views */
+function dayIndex(){ const d=new Date(); return Math.floor((Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()))/864e5) % ALL.length; }
+
+function ring(frac){
+  const r=30, c=2*Math.PI*r, off=c*(1-frac);
+  return `<svg class="ring" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="${r}" fill="none" stroke="var(--sunk)" stroke-width="7"/><circle cx="36" cy="36" r="${r}" fill="none" stroke="var(--saffron)" stroke-width="7" stroke-linecap="round" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 36 36)"/><text x="36" y="41" text-anchor="middle" font-family="Atkinson Hyperlegible, system-ui, sans-serif" font-size="15" fill="var(--ink)">${Math.round(frac*100)}%</text></svg>`;
+}
+
+function vItem(v, showText){
+  const t = TEXT_OF[v.id]; const done = S.done.includes(v.id);
+  return `<a class="item" href="#v-${v.id}"><div><span class="sub">${h(showText ? t.name+" · " : "")}${h(v.ref.replace(t.name+" ",""))}</span><p class="snip">${h(v.tr)}</p></div><span class="chev">${done ? '<span class="pill done">studied</span>' : '›'}</span></a>`;
+}
+
+function Home(){
+  const v = ALL[dayIndex()]; const t = TEXT_OF[v.id];
+  const frac = S.done.length / ALL.length;
+  const last = S.last && BY_ID[S.last];
+  return `<div class="stack">
+    <section class="hero" aria-label="It moves and it moves not">
+      <canvas id="pend" aria-label="A pendulum swinging. Its turning points glow saffron where it comes to rest."></canvas>
+      <div class="phase"><i style="--c:var(--saffron)">rest point · still</i><i style="--c:var(--teal)">mid-swing · fastest</i></div>
+      <div class="q">
+        <p class="dev">तदेजति तन्नैजति</p>
+        <p class="iast">tad ejati tan naijati</p>
+        <p>“It moves, and it does not move.” The Īśa Upaniṣad says it in four words; Itzhak Bentov drew it as a pendulum.
+        <a href="#bridges" class="iast" style="color:var(--teal-ink)">See the bridges →</a></p>
+      </div>
+    </section>
+
+    <section class="card stack" style="gap:12px">
+      <p class="eyebrow">Today’s verse · ${h(t.name)}</p>
+      <p class="dev">${br(v.dev)}</p>
+      <p class="iast">${br(v.iast)}</p>
+      <p class="tr">${h(v.tr)}</p>
+      <div class="row"><a class="btn primary" href="#v-${v.id}">Study this verse</a>${v.bentov ? '<span class="pill b">has a Bentov lens</span>' : ''}</div>
+    </section>
+
+    <section class="stat">
+      ${ring(frac)}
+      <div class="stack" style="gap:4px">
+        <p><b>${S.done.length}</b> of ${ALL.length} verses studied</p>
+        <p class="muted" style="font-size:var(--s-sm)">${S.bm.length} saved · ${Object.keys(S.notes).filter(k=>S.notes[k]).length} with notes</p>
+        ${last ? `<a class="crumb" href="#v-${last.id}">Continue: ${h(last.ref)} ›</a>` : `<a class="crumb" href="#texts">Start with the Īśa Upaniṣad ›</a>`}
+      </div>
+    </section>
+
+    <section class="stack" style="gap:8px">
+      <div class="group-h"><h2>Paths in</h2></div>
+      <div class="list">
+        <a class="item" href="#t-isha"><div><h3>Start with the Īśa</h3><p class="snip">Eighteen verses. Verses 4 and 5 are where Bentov’s pendulum lives.</p></div><span class="chev">›</span></a>
+        <a class="item" href="#t-mandukya"><div><h3>Map the states of mind</h3><p class="snip">The Māṇḍūkya’s waking, dream, sleep and the fourth, next to Bentov’s levels of consciousness.</p></div><span class="chev">›</span></a>
+        <a class="item" href="#bentov"><div><h3>Read Bentov’s ideas</h3><p class="snip">Eight core ideas from his two books, each linked to the verses they echo.</p></div><span class="chev">›</span></a>
+        <a class="item" href="#study"><div><h3>Learn the vocabulary</h3><p class="snip">${GLOSSARY.length} Sanskrit terms as a glossary and flashcards.</p></div><span class="chev">›</span></a>
+      </div>
+    </section>
+  </div>`;
+}
+
+function Texts(){
+  return `<div class="stack">
+    <div class="stack" style="gap:6px"><h1 style="font-size:var(--s-2xl)">Texts</h1>
+    <p class="lede">${ALL.length} key verses across ${TEXTS.length} works, from the Ṛg Veda to Śaṅkara. Sanskrit with transliteration, a plain English rendering and a study note.</p></div>
+    ${GROUPS.map(g => `<section class="stack" style="gap:6px">
+      <div class="group-h"><h2>${h(g)}</h2></div>
+      <div class="list">${TEXTS.filter(t=>t.group===g).map(t => {
+        const n=t.verses.length, d=t.verses.filter(v=>S.done.includes(v.id)).length;
+        return `<a class="item" href="#t-${t.id}"><div><h3>${h(t.name)} <span class="muted" style="font-size:var(--s-md)">${h(t.dev)}</span></h3><p class="snip">${h(t.blurb)}</p>
+          <div class="row" style="margin-top:6px"><div class="meter" style="flex:1;max-width:10rem"><i style="width:${(d/n*100).toFixed(0)}%"></i></div><span class="count">${d}/${n}</span></div></div><span class="chev">›</span></a>`;
+      }).join("")}</div></section>`).join("")}
+    <p class="note-small">Sanskrit is the traditional text. English renderings and notes are original study paraphrases. For close study, pair them with a full translation and commentary, such as Swami Gambhirananda’s translations of Śaṅkara’s commentaries or Eknath Easwaran’s Upaniṣads.</p>
+  </div>`;
+}
+
+function Text(id){
+  const t = TEXTS.find(x=>x.id===id); if(!t) return NotFound();
+  return `<div class="stack">
+    <a class="crumb" href="#texts">‹ All texts</a>
+    <div class="stack" style="gap:6px"><p class="eyebrow">${h(t.group)}</p><h1 style="font-size:var(--s-2xl)">${h(t.name)}</h1><p class="dev" style="color:var(--saffron-ink)">${h(t.dev)}</p><p class="lede">${h(t.blurb)}</p></div>
+    <div class="list">${t.verses.map(v=>vItem(v,false)).join("")}</div>
+  </div>`;
+}
+
+function Verse(id){
+  const v = BY_ID[id]; if(!v) return NotFound();
+  const t = TEXT_OF[id]; const i = ALL.indexOf(v);
+  const prev = ALL[i-1], next = ALL[i+1];
+  const bm = S.bm.includes(id), done = S.done.includes(id), note = S.notes[id] || "";
+  S.last = id; save();
+  return `<article class="verse">
+    <a class="crumb" href="#t-${t.id}">‹ ${h(t.name)}</a>
+    <p class="ref">${h(v.ref)}</p>
+    <p class="dev" lang="sa">${br(v.dev)}</p>
+    <p class="iast" lang="sa-Latn">${br(v.iast)}</p>
+    <p class="tr">${h(v.tr)}</p>
+    <div class="vnote"><p class="eyebrow">Study note</p><p>${h(v.note)}</p></div>
+    ${v.bentov ? `<div class="lens"><p class="eyebrow">Bentov lens</p><p>${h(v.bentov)}</p></div>` : ""}
+    <div class="row">
+      <button class="btn ${done?'on':''}" data-act="done" data-id="${id}" type="button" aria-pressed="${done}">${I.ok}${done?'Studied':'Mark studied'}</button>
+      <button class="btn ${bm?'on':''}" data-act="bm" data-id="${id}" type="button" aria-pressed="${bm}">${I.bm}${bm?'Saved':'Save'}</button>
+      <button class="btn" data-act="copy" data-id="${id}" type="button">${I.copy}Copy</button>
+    </div>
+    <div class="stack" style="gap:8px">
+      <label class="eyebrow" for="note-${id}">Your reflection</label>
+      <textarea id="note-${id}" data-note="${id}" placeholder="What does this verse say to you? How does it connect with Bentov, or with your own practice?">${h(note)}</textarea>
+      <p class="note-small">Notes save on this device as you type.</p>
+    </div>
+    <nav class="pager" aria-label="Verse navigation">
+      ${prev ? `<a class="btn" href="#v-${prev.id}"><small>‹ Previous</small><span>${h(prev.ref)}</span></a>` : '<span></span>'}
+      ${next ? `<a class="btn next" href="#v-${next.id}"><small>Next ›</small><span>${h(next.ref)}</span></a>` : '<span></span>'}
+    </nav>
+  </article>`;
+}
+
+function Bentov(){
+  return `<div class="stack">
+    <div class="stack" style="gap:6px"><p class="eyebrow" style="color:var(--teal-ink)">Itzhak Bentov · 1923–1979</p><h1 style="font-size:var(--s-2xl)">A physicist’s door into the Vedas</h1>
+    <p class="lede">Bentov was a Czech-born inventor and biomedical engineer, best known for the steerable cardiac catheter. He spent his last years building a mechanical model of consciousness, and many readers have found it a way into Vedic ideas.</p></div>
+    <section class="hero"><canvas id="pend" aria-label="A pendulum swinging. Its turning points glow saffron where it comes to rest."></canvas>
+      <div class="phase"><i style="--c:var(--saffron)">rest point · touches the Absolute</i><i style="--c:var(--teal)">mid-swing · relative world</i></div></section>
+    <section class="stack" style="gap:14px">
+      <div class="group-h"><h2>The books</h2></div>
+      <div class="card book"><p class="eyebrow">1977</p><h3>Stalking the Wild Pendulum</h3><p class="muted">Subtitled “On the Mechanics of Consciousness”. Vibration, the rest point, subjective time, the hologram, and his appendix on micromotion and kuṇḍalinī.</p></div>
+      <div class="card book"><p class="eyebrow">1982 · with Mirtala</p><h3>A Cosmic Book</h3><p class="muted">Subtitled “On the Mechanics of Creation”. A lightly written, illustrated cosmology: the cosmic egg, creation as the Absolute knowing itself, and the evolution of consciousness. Published after his death.</p></div>
+    </section>
+    <section class="stack" style="gap:0">
+      <div class="group-h" style="margin-bottom:4px"><h2>Eight core ideas</h2></div>
+      <p class="note-small" style="margin-bottom:8px">Summaries in our own words, offered as study aids. Read Bentov himself for the full arguments, and treat his physiology as hypothesis.</p>
+      ${BENTOV_IDEAS.map(x=>`<div class="idea"><h3>${h(x.t)}</h3><p>${h(x.d)}</p><div class="links">${x.links.map(l=>`<a href="#v-${l}">${h(BY_ID[l].ref.split(" · ")[0])}</a>`).join("")}</div></div>`).join("")}
+    </section>
+  </div>`;
+}
+
+function Bridges(){
+  return `<div class="stack">
+    <div class="stack" style="gap:6px"><h1 style="font-size:var(--s-2xl)">Bridges</h1>
+    <p class="lede">Nine places where a Vedic idea and a Bentov idea meet. Each one says where they agree and where they part ways; the differences teach as much as the likenesses.</p></div>
+    ${BRIDGES.map((b,i)=>`<details class="bridge" id="br-${b.id}" ${i===0?'open':''}>
+      <summary><div class="pair">
+        <div class="v"><span class="side">Vedic</span><b>${h(b.v)}</b><span class="iast" style="font-size:var(--s-sm)">${h(b.vdev)}</span></div>
+        ${knot}
+        <div class="bt"><span class="side">Bentov</span><b>${h(b.b)}</b></div>
+      </div></summary>
+      <div class="body">
+        <div class="split"><div class="v"><p class="eyebrow" style="color:var(--saffron-ink)">In the texts</p><p>${h(b.vtxt)}</p></div>
+        <div class="bt"><p class="eyebrow" style="color:var(--teal-ink)">In Bentov</p><p>${h(b.btxt)}</p></div></div>
+        <div class="diff"><p class="eyebrow">Where they differ</p><p>${h(b.diff)}</p></div>
+        <div class="links">${b.links.map(l=>`<a href="#v-${l}">${h(BY_ID[l].ref.split(" · ")[0])}</a>`).join("")}</div>
+      </div></details>`).join("")}
+  </div>`;
+}
+
+let card = null, flipped = false;
+function pickCard(){
+  const terms = GLOSSARY.map(g=>g[0]);
+  const min = Math.min(...terms.map(t=>S.box[t]||0));
+  const pool = terms.filter(t=>(S.box[t]||0)===min && t!==card);
+  card = (pool.length?pool:terms)[Math.floor(Math.random()*(pool.length||terms.length))];
+  flipped = false;
+}
+function Study(){
+  const tab = S.studyTab;
+  const seg = `<div class="seg" role="group" aria-label="Study mode">${[["glossary","Glossary"],["cards","Flashcards"],["saved","Saved"]].map(([k,l])=>`<button type="button" data-tab="${k}" aria-pressed="${tab===k}">${l}</button>`).join("")}</div>`;
+  let body = "";
+  if (tab==="glossary"){
+    body = `<div class="list" style="border-top:0">${GLOSSARY.map(([n,d,m])=>`<div class="gl"><div class="gd" lang="sa">${h(d)}</div><div><b>${h(n)}</b><p class="muted" style="font-size:var(--s-sm)">${h(m)}</p></div></div>`).join("")}</div>`;
+  } else if (tab==="cards"){
+    if(!card) pickCard();
+    const g = GLOSSARY.find(x=>x[0]===card);
+    const counts=[0,0,0,0,0]; GLOSSARY.forEach(x=>counts[Math.min(4,S.box[x[0]]||0)]++);
+    body = `<p class="lede">Tap the card to reveal its meaning. Cards you know move up a box and come back less often.</p>
+      <div class="flash"><button class="face" type="button" id="flip" aria-live="polite">${flipped
+        ? `<span class="iast" style="font-size:var(--s-lg)">${h(g[0])}</span><span style="font-size:var(--s-lg)">${h(g[2])}</span>`
+        : `<span class="big" lang="sa">${h(g[1])}</span><span class="hint">Tap to reveal</span>`}</button></div>
+      <div class="row" style="justify-content:center"><button class="btn" type="button" data-grade="0">Again</button><button class="btn primary" type="button" data-grade="1">I know it</button></div>
+      <div class="boxes" aria-label="Cards per box">${counts.map((c,i)=>`<div><b>${c}</b>${i===0?'new':'box '+i}</div>`).join("")}</div>`;
+  } else {
+    const saved = S.bm.map(id=>BY_ID[id]).filter(Boolean);
+    const noted = Object.keys(S.notes).filter(k=>S.notes[k] && BY_ID[k]);
+    body = `<section class="stack" style="gap:6px"><div class="group-h"><h2>Saved verses</h2><span class="count">${saved.length}</span></div>
+      ${saved.length ? `<div class="list">${saved.map(v=>vItem(v,true)).join("")}</div>` : `<div class="empty">Verses you save appear here. Tap <b>Save</b> on any verse.</div>`}</section>
+      <section class="stack" style="gap:6px"><div class="group-h"><h2>Reflections</h2><span class="count">${noted.length}</span></div>
+      ${noted.length ? `<div class="list">${noted.map(k=>`<a class="item" href="#v-${k}"><div><span class="sub">${h(BY_ID[k].ref)}</span><p class="snip">${h(S.notes[k])}</p></div><span class="chev">›</span></a>`).join("")}</div>` : `<div class="empty">Your written reflections on verses gather here.</div>`}</section>
+      ${(saved.length||noted.length||S.done.length) ? `<button class="btn" type="button" id="resetBtn">Clear all progress…</button><div id="resetConfirm" hidden class="card stack" style="gap:10px"><p>This removes saved verses, studied marks, notes and flashcard boxes on this device.</p><div class="row"><button class="btn primary" type="button" id="resetYes">Clear everything</button><button class="btn" type="button" id="resetNo">Keep it</button></div></div>` : ""}`;
+  }
+  return `<div class="stack"><h1 style="font-size:var(--s-2xl)">Study</h1>${seg}${body}</div>`;
+}
+
+let q = "";
+function Find(){
+  return `<div class="stack">
+    <h1 style="font-size:var(--s-2xl)">Search</h1>
+    <input type="search" id="q" placeholder="Try ‘brahman’, ‘pendulum’, ‘witness’, ‘ॐ’" value="${h(q)}" autocomplete="off" aria-label="Search verses, terms and bridges">
+    <div id="results"></div></div>`;
+}
+const norm = s => s.normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+function results(){
+  const box = $("#results"); if(!box) return;
+  const n = norm(q.trim());
+  if (n.length < 2) { box.innerHTML = `<p class="muted">Search Sanskrit, transliteration (diacritics optional), translations, notes and Bentov lenses.</p>`; return; }
+  const vs = ALL.filter(v => norm([v.ref,v.dev,v.iast,v.tr,v.note,v.bentov||""].join(" ")).includes(n));
+  const gs = GLOSSARY.filter(g => norm(g.join(" ")).includes(n));
+  const bs = BRIDGES.filter(b => norm([b.v,b.vdev,b.b,b.vtxt,b.btxt,b.diff].join(" ")).includes(n));
+  box.innerHTML = (vs.length+gs.length+bs.length===0) ? `<div class="empty">Nothing matches “${h(q)}”. Try a shorter word or a different spelling.</div>` :
+   `${vs.length?`<section class="stack" style="gap:6px"><div class="group-h"><h2 style="font-size:var(--s-lg)">Verses</h2><span class="count">${vs.length}</span></div><div class="list">${vs.map(v=>vItem(v,true)).join("")}</div></section>`:""}
+    ${bs.length?`<section class="stack" style="gap:6px;margin-top:16px"><div class="group-h"><h2 style="font-size:var(--s-lg)">Bridges</h2><span class="count">${bs.length}</span></div><div class="list">${bs.map(b=>`<a class="item" href="#bridges" data-open="${b.id}"><div><h3>${h(b.v)} ⇄ ${h(b.b)}</h3></div><span class="chev">›</span></a>`).join("")}</div></section>`:""}
+    ${gs.length?`<section class="stack" style="gap:6px;margin-top:16px"><div class="group-h"><h2 style="font-size:var(--s-lg)">Terms</h2><span class="count">${gs.length}</span></div><div class="list" style="border-top:0">${gs.map(([nm,d,m])=>`<div class="gl"><div class="gd">${h(d)}</div><div><b>${h(nm)}</b><p class="muted" style="font-size:var(--s-sm)">${h(m)}</p></div></div>`).join("")}</div></section>`:""}`;
+}
+
+function NotFound(){ return `<div class="empty">That page doesn’t exist. <a href="#home">Go to Today</a>.</div>`; }
+
+/* ------------------------------------------------------------------ pendulum */
+let raf = 0;
+function startPendulum(){
+  cancelAnimationFrame(raf);
+  const cv = $("#pend"); if(!cv) return;
+  const ctx = cv.getContext("2d");
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  function size(){ const r = cv.getBoundingClientRect(), d = devicePixelRatio||1; cv.width = r.width*d; cv.height = r.height*d; ctx.setTransform(d,0,0,d,0,0); return r; }
+  let R = size();
+  const A = 0.62, T = 3.2; // amplitude (rad), period (s)
+  const t0 = performance.now();
+  const trail = [];
+  function draw(now){
+    if(!document.body.contains(cv)) return;
+    const w = R.width, hgt = R.height;
+    const ink = css("--ink"), muted = css("--muted"), sa = css("--saffron"), te = css("--teal"), line = css("--line");
+    const px = w/2, py = 18, L = hgt - 58;
+    const tt = reduce ? T/4 : (now - t0)/1000;
+    const th = A*Math.cos(2*Math.PI*tt/T);
+    const sp = Math.abs(Math.sin(2*Math.PI*tt/T)); // 0 at rest points, 1 mid-swing
+    ctx.clearRect(0,0,w,hgt);
+    // arc
+    ctx.strokeStyle = line; ctx.lineWidth = 1; ctx.setLineDash([3,5]);
+    ctx.beginPath(); ctx.arc(px,py,L,Math.PI/2-A,Math.PI/2+A); ctx.stroke(); ctx.setLineDash([]);
+    // rest-point halos
+    [-A,A].forEach(a=>{ const x=px+L*Math.sin(a), y=py+L*Math.cos(a);
+      ctx.fillStyle = sa; ctx.globalAlpha = 0.12 + 0.5*Math.max(0,1-Math.abs(th - a)/0.25);
+      ctx.beginPath(); ctx.arc(x,y,22,0,Math.PI*2); ctx.fill(); ctx.globalAlpha = 1; });
+    // centre marker
+    ctx.fillStyle = te; ctx.globalAlpha = 0.18 + 0.4*sp; ctx.beginPath(); ctx.arc(px, py+L, 6, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
+    // bob
+    const bx = px + L*Math.sin(th), by = py + L*Math.cos(th);
+    trail.push([bx,by]); if(trail.length>14) trail.shift();
+    trail.forEach(([x,y],i)=>{ ctx.globalAlpha = i/trail.length*0.25; ctx.fillStyle = te; ctx.beginPath(); ctx.arc(x,y,9,0,Math.PI*2); ctx.fill(); });
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = muted; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(bx,by); ctx.stroke();
+    ctx.fillStyle = ink; ctx.beginPath(); ctx.arc(px,py,3,0,Math.PI*2); ctx.fill();
+    // bob colour blends teal→saffron as it slows
+    ctx.fillStyle = sp > 0.35 ? te : sa;
+    ctx.beginPath(); ctx.arc(bx,by,11,0,Math.PI*2); ctx.fill();
+    // label
+    ctx.font = "13px 'Atkinson Hyperlegible', system-ui, sans-serif"; ctx.textAlign = "center"; ctx.fillStyle = muted;
+    ctx.fillText(sp < 0.2 ? "at rest · velocity ≈ 0" : sp > 0.9 ? "fastest · lowest point" : "swinging", px, hgt - 12);
+    if(!reduce) raf = requestAnimationFrame(draw);
+  }
+  addEventListener("resize", () => { R = size(); if (reduce) draw(performance.now()); }, {once:true});
+  draw(performance.now());
+}
+
+/* ------------------------------------------------------------------ router */
+function route(){
+  const hash = (location.hash||"#home").slice(1);
+  let html, tab = "home";
+  if (hash==="home"||hash==="") html = Home();
+  else if (hash==="texts") { html = Texts(); tab="texts"; }
+  else if (hash.startsWith("t-")) { html = Text(hash.slice(2)); tab="texts"; }
+  else if (hash.startsWith("v-")) { html = Verse(hash.slice(2)); tab="texts"; }
+  else if (hash==="bentov") { html = Bentov(); tab="bentov"; }
+  else if (hash==="bridges") { html = Bridges(); tab="bridges"; }
+  else if (hash==="study") { html = Study(); tab="study"; }
+  else if (hash==="find") { html = Find(); tab=""; }
+  else html = NotFound();
+  view.innerHTML = html;
+  document.querySelectorAll(".tabs a").forEach(a => { if (a.dataset.tab===tab) a.setAttribute("aria-current","page"); else a.removeAttribute("aria-current"); });
+  window.scrollTo(0,0);
+  startPendulum();
+  if (hash==="find"){ const i=$("#q"); results(); i.addEventListener("input",()=>{q=i.value;results();}); setTimeout(()=>i.focus(),50); }
+  if (hash==="bridges" && route.openBridge){ const d = document.getElementById("br-"+route.openBridge); if(d){ document.querySelectorAll(".bridge").forEach(x=>x.open=false); d.open=true; d.scrollIntoView({block:"start"}); } route.openBridge=null; }
+}
+addEventListener("hashchange", route);
+
+/* delegated events */
+view.addEventListener("click", e => {
+  const a = e.target.closest("[data-act]");
+  if (a){
+    const id = a.dataset.id;
+    if (a.dataset.act==="done"){ const on=!S.done.includes(id); S.done = on ? [...S.done,id] : S.done.filter(x=>x!==id); save(); toast(on?"Marked studied":"Unmarked"); }
+    if (a.dataset.act==="bm"){ const on=!S.bm.includes(id); S.bm = on ? [...S.bm,id] : S.bm.filter(x=>x!==id); save(); toast(on?"Saved":"Removed from saved"); }
+    if (a.dataset.act==="copy"){ const v=BY_ID[id]; const txt=`${v.dev}\n${v.iast}\n\n${v.tr}\n— ${v.ref}`;
+      try { navigator.clipboard.writeText(txt).then(()=>toast("Copied"),()=>toast("Copy isn’t available here; select the text instead")); } catch(err){ toast("Copy isn’t available here; select the text instead"); } return; }
+    const y = scrollY; view.innerHTML = Verse(id); scrollTo(0,y); return;
+  }
+  const tb = e.target.closest(".seg button");
+  if (tb){ S.studyTab = tb.dataset.tab; save(); view.innerHTML = Study(); return; }
+  if (e.target.closest("#flip")){ flipped = !flipped; view.innerHTML = Study(); return; }
+  const gr = e.target.closest("[data-grade]");
+  if (gr){ const k=card; S.box[k] = gr.dataset.grade==="1" ? Math.min(4,(S.box[k]||0)+1) : 0; save(); pickCard(); view.innerHTML = Study(); return; }
+  const op = e.target.closest("[data-open]");
+  if (op){ route.openBridge = op.dataset.open; if (location.hash==="#bridges") { e.preventDefault(); route(); } }
+  if (e.target.id==="resetBtn"){ $("#resetConfirm").hidden=false; e.target.hidden=true; }
+  if (e.target.id==="resetNo"){ view.innerHTML = Study(); }
+  if (e.target.id==="resetYes"){ S.bm=[];S.done=[];S.notes={};S.box={};S.last=null; save(); view.innerHTML = Study(); toast("Progress cleared"); }
+});
+view.addEventListener("input", e => {
+  const id = e.target.dataset && e.target.dataset.note;
+  if (id){ S.notes[id] = e.target.value; clearTimeout(view._n); view._n = setTimeout(save, 300); }
+});
+
+route();
+</script>
+</body>
+</html>
